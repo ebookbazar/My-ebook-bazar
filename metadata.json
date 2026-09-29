@@ -1,0 +1,6 @@
+{
+  "name": "eBookBazar",
+  "description": "Blogger eCommerce + eBook Marketplace + Affiliate + Seller Platform with Firebase Database and Full Admin Panel",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
