@@ -2,7 +2,6 @@ import React from 'react';
 import { X, ShoppingCart, Zap, BookOpen, Star, User, Tag, ShieldCheck, Crown, ShoppingBag } from 'lucide-react';
 import { Ebook } from '../types';
 import { useCart } from '../context/CartContext';
-import { AdsterraSlot } from './AdsterraSlot';
 
 interface EbookDetailModalProps {
   ebook: Ebook | null;
@@ -166,9 +165,6 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
                 <ShieldCheck className="w-4 h-4" />
                 <span>অর্ডার অনুমোদনের পর সরাসরি লাইব্রেরি থেকে PDF ডাউনলোড ও পড়ার সুবিধা</span>
               </div>
-
-              {/* Adsterra eBook Details Ad Placement */}
-              <AdsterraSlot placement="ebookDetails" className="my-2" />
             </div>
 
             {/* Action Buttons */}

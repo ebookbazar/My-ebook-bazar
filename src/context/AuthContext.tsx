@@ -115,6 +115,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         prof = { uid, ...sellerSnap.val() } as SellerProfile;
       } else if (userSnap.exists()) {
         prof = { uid, ...userSnap.val() } as UserProfile;
+        if (prof?.role === 'admin') {
+          userIsAdmin = true;
+        }
       }
 
       // If user exists in auth but missing in DB, bootstrap safe profile with permanent referral code

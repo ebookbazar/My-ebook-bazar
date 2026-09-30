@@ -1,7 +1,6 @@
 import React from 'react';
 import { X, Calendar, Clock, User, Share2, BookOpen, ArrowRight } from 'lucide-react';
 import { BlogPost } from '../types';
-import { AdsterraSlot } from './AdsterraSlot';
 
 interface BlogModalProps {
   post: BlogPost | null;
@@ -88,9 +87,6 @@ export const BlogModal: React.FC<BlogModalProps> = ({ post, onClose, onExploreEb
               </p>
             ))}
           </div>
-
-          {/* Adsterra Blog Article Ad Placement */}
-          <AdsterraSlot placement="blogArticle" className="my-4" />
 
           {/* Call to action */}
           <div className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

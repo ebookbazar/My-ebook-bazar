@@ -234,44 +234,6 @@ export interface Review {
   createdAt: number;
 }
 
-export interface AdsterraConfig {
-  enabled: boolean;
-  homepageEnabled: boolean;
-  blogListingEnabled: boolean;
-  blogArticleEnabled: boolean;
-  ebookListingEnabled: boolean;
-  ebookDetailsEnabled: boolean;
-  mobileEnabled: boolean;
-  desktopEnabled: boolean;
-  mobileAdCode: string;
-  desktopAdCode: string;
-  homepageAdCode: string;
-  blogListingAdCode: string;
-  blogArticleAdCode: string;
-  ebookListingAdCode: string;
-  ebookDetailsAdCode: string;
-  updatedAt?: number;
-}
-
-export const DEFAULT_ADSTERRA_CONFIG: AdsterraConfig = {
-  enabled: true,
-  homepageEnabled: true,
-  blogListingEnabled: true,
-  blogArticleEnabled: true,
-  ebookListingEnabled: true,
-  ebookDetailsEnabled: true,
-  mobileEnabled: true,
-  desktopEnabled: true,
-  mobileAdCode: '',
-  desktopAdCode: '',
-  homepageAdCode: '',
-  blogListingAdCode: '',
-  blogArticleAdCode: '',
-  ebookListingAdCode: '',
-  ebookDetailsAdCode: '',
-  updatedAt: 0
-};
-
 export interface LiveChatMessage {
   id: string;
   senderId: string;
@@ -323,4 +285,33 @@ export interface SupportTicket {
   unreadByUser?: boolean;
   unreadByAdmin?: boolean;
 }
+
+export interface AppDownloadSettings {
+  appDownloadTitle: string;
+  appDownloadText: string;
+  appDownloadUrl: string;
+  url?: string;
+  downloadUrl?: string;
+  active?: boolean;
+  downloads?: number;
+  downloadCount?: number;
+  appDownloadEnabled: boolean;
+  updatedAt?: number;
+}
+
+export const DEFAULT_APP_DOWNLOAD_SETTINGS: AppDownloadSettings = {
+  appDownloadTitle: '📱 eBookBazar App Download',
+  appDownloadText: 'মোবাইলে eBookBazar আরও সহজে ব্যবহার করতে App Download করুন।',
+  appDownloadUrl: '',
+  appDownloadEnabled: true,
+  updatedAt: 0,
+};
+
+export interface AppDownloadStats {
+  totalClicks: number;
+  daily?: Record<string, number>;
+  lastClickAt?: number;
+  resetAt?: number;
+}
+
 

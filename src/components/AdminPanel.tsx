@@ -38,9 +38,13 @@ import {
   ChevronDown,
   ChevronUp,
   Mail,
-  Phone
+  Phone,
+  Smartphone,
+  LogOut,
+  LogIn,
+  Home
 } from 'lucide-react';
-import { db, ref, onValue, update, remove, set, push, get, serverTimestamp } from '../firebase';
+import { auth, db, ref, onValue, update, remove, set, push, get, serverTimestamp, signInWithEmailAndPassword } from '../firebase';
 import { INITIAL_EBOOKS } from '../data/initialEbooks';
 import { 
   UserProfile, 
@@ -52,13 +56,16 @@ import {
   NotificationItem, 
   PaymentSettings,
   HeaderNavCard,
-  AdsterraConfig,
-  DEFAULT_ADSTERRA_CONFIG,
   AffiliateTransaction,
   SupportTicket,
   TicketCategory,
-  TicketStatus
+  TicketStatus,
+  AppDownloadSettings,
+  DEFAULT_APP_DOWNLOAD_SETTINGS,
+  AppDownloadStats
 } from '../types';
+import { useAuth } from '../context/AuthContext';
+import { calculateAppDownloadMetrics, resetAppDownloadStats, formatAndValidateDownloadUrl } from '../services/appDownloadService';
 
 const TICKET_CATEGORIES: TicketCategory[] = [
   'পেমেন্ট ও রিফান্ড',
@@ -75,17 +82,84 @@ interface AdminPanelProps {
   onClose: () => void;
   onOpenReader: (url: string, title: string) => void;
   onOpenBlogManager?: () => void;
+  onNavigateHome?: () => void;
 }
 
-export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, onOpenBlogManager }) => {
+export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, onOpenBlogManager, onNavigateHome }) => {
+  const { currentUser, userProfile, isAdmin, logout, login, resetPassword } = useAuth();
+
+  // Admin Login / Logout State & Handlers
+  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
+  const [loginEmail, setLoginEmail] = useState('admin@ebookbazar.com');
+  const [loginPassword, setLoginPassword] = useState('Admin@123456');
+  const [loggingIn, setLoggingIn] = useState(false);
+
+  const handleGoToHome = () => {
+    setIsLoginModalOpen(false);
+    onClose();
+    if (onNavigateHome) {
+      onNavigateHome();
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleLogout = async () => {
+    try {
+      if (currentUser) {
+        await logout();
+      }
+      showToast('info', 'অ্যাডমিন অ্যাকাউন্ট থেকে লগআউট সম্পন্ন হয়েছে।');
+    } catch (err: any) {
+      console.error('Logout error:', err);
+    } finally {
+      // Immediately open and show Admin Login modal
+      setIsLoginModalOpen(true);
+    }
+  };
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!loginEmail.trim() || !loginPassword.trim()) {
+      showToast('error', 'দয়া করে ইমেইল ও পাসওয়ার্ড প্রদান করুন।');
+      return;
+    }
+    setLoggingIn(true);
+    try {
+      await login(loginEmail.trim(), loginPassword.trim());
+      showToast('success', 'অ্যাডমিন হিসেবে সফলভাবে লগইন সম্পন্ন হয়েছে!');
+      setIsLoginModalOpen(false);
+    } catch (err: any) {
+      console.error('Admin Login error:', err);
+      showToast('error', 'লগইন ব্যর্থ হয়েছে: ' + (err?.message || err));
+    } finally {
+      setLoggingIn(false);
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!loginEmail.trim()) {
+      showToast('error', 'দয়া করে ইমেইল ঠিকানাটি লিখুন।');
+      return;
+    }
+    try {
+      await resetPassword(loginEmail.trim());
+      showToast('success', `${loginEmail.trim()} ঠিকানায় পাসওয়ার্ড রিসেট লিংক পাঠানো হয়েছে! অনুগ্রহ করে ইনবক্স চেক করুন।`);
+    } catch (err: any) {
+      showToast('error', 'পাসওয়ার্ড রিসেট করতে সমস্যা: ' + (err?.message || err));
+    }
+  };
+
   // Tabs
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'users' | 'sellers' | 'ebooks' | 'orders' | 'memberships' | 'withdrawals' | 'settings' | 'notifications' | 'affiliates' | 'rules' | 'xml' | 'adsterra' | 'tickets'
+    'overview' | 'users' | 'sellers' | 'ebooks' | 'orders' | 'memberships' | 'withdrawals' | 'settings' | 'notifications' | 'affiliates' | 'rules' | 'xml' | 'tickets' | 'app-download'
   >('overview');
 
-  // Adsterra Monetization Config State
-  const [adsterraConfig, setAdsterraConfig] = useState<AdsterraConfig>(DEFAULT_ADSTERRA_CONFIG);
-  const [savingAdsterra, setSavingAdsterra] = useState(false);
+  // App Download Settings & Statistics State (Simplified: Only URL & Download Count)
+  const [appDownloadUrl, setAppDownloadUrl] = useState<string>('');
+  const [downloadCount, setDownloadCount] = useState<number>(0);
+  const [savingAppDownload, setSavingAppDownload] = useState(false);
+  const [appDownloadSettings, setAppDownloadSettings] = useState<AppDownloadSettings>(DEFAULT_APP_DOWNLOAD_SETTINGS);
+  const [appDownloadStats, setAppDownloadStats] = useState<AppDownloadStats>({ totalClicks: 0 });
 
   // Realtime Data Collections
   const [users, setUsers] = useState<Record<string, UserProfile>>({});
@@ -230,13 +304,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
       }
     });
 
-    const unsubAdsterra = onValue(ref(db, 'ebooks/_adsterra'), (snap) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val) setAdsterraConfig(prev => ({ ...prev, ...val }));
-      }
-    });
-
     const unsubFooterLinks = onValue(ref(db, 'settings/footerLinks'), (snap) => {
       if (snap.exists()) {
         const val = snap.val();
@@ -246,6 +313,79 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
 
     const unsubTickets = onValue(ref(db, 'supportTickets'), (snap) => {
       setTickets(snap.val() || {});
+    });
+
+    const handleDownloadSnap = (snap: any) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val) {
+          if (typeof val === 'string') {
+            const raw = val.trim();
+            setAppDownloadUrl(raw);
+            setAppDownloadSettings(prev => ({
+              ...prev,
+              url: raw,
+              downloadUrl: raw,
+              appDownloadUrl: raw,
+              active: Boolean(raw),
+              appDownloadEnabled: Boolean(raw)
+            }));
+          } else if (typeof val === 'object') {
+            const urlVal = (val.downloadUrl || val.url || val.appDownloadUrl || val.app_download_url || '').trim();
+            const isActive = val.active !== false && val.appDownloadEnabled !== false;
+            // Put the URL back into the input box
+            setAppDownloadUrl(urlVal);
+            const countVal = Number(val.downloads ?? val.downloadCount ?? val.count ?? 0);
+            setDownloadCount(countVal);
+            setAppDownloadSettings(prev => ({
+              ...prev,
+              ...val,
+              url: urlVal,
+              downloadUrl: urlVal,
+              appDownloadUrl: urlVal,
+              active: isActive,
+              appDownloadEnabled: isActive,
+              downloads: countVal
+            }));
+            setAppDownloadStats(prev => ({ ...prev, totalClicks: countVal }));
+          }
+        }
+      }
+    };
+
+    const unsubAppDownloadPlatform = onValue(ref(db, 'ebooks/_platformStats'), (snap) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val && (val.appDownloadUrl || val.downloadUrl)) {
+          const directUrl = (val.appDownloadUrl || val.downloadUrl || '').trim();
+          const isActive = val.active !== false && val.appDownloadActive !== false && Boolean(directUrl);
+          if (directUrl) setAppDownloadUrl(directUrl);
+          const count = Number(val.appDownloadCount ?? val.downloads ?? val.downloadCount ?? 0);
+          setDownloadCount(count);
+          setAppDownloadSettings(prev => ({
+            ...prev,
+            url: directUrl,
+            downloadUrl: directUrl,
+            appDownloadUrl: directUrl,
+            active: isActive,
+            appDownloadEnabled: isActive
+          }));
+          setAppDownloadStats(prev => ({ ...prev, totalClicks: count }));
+        }
+      }
+    });
+
+    const unsubAppDownload0 = onValue(ref(db, 'ebooks/_appDownload'), handleDownloadSnap);
+    const unsubAppDownload1 = onValue(ref(db, 'appDownload'), handleDownloadSnap);
+    const unsubAppDownload2 = onValue(ref(db, 'settings/appDownload'), (snap) => {
+      if (snap.exists()) handleDownloadSnap(snap);
+    });
+
+    const unsubAppDownloadStats = onValue(ref(db, 'appDownloadStats/totalClicks'), (snap) => {
+      if (snap.exists()) {
+        const c = Number(snap.val() || 0);
+        setDownloadCount(prev => Math.max(prev, c));
+      }
     });
 
     return () => {
@@ -260,9 +400,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
       unsubComm();
       unsubAffTxs();
       unsubSettings();
-      unsubAdsterra();
       unsubFooterLinks();
       unsubTickets();
+      unsubAppDownloadPlatform();
+      unsubAppDownload0();
+      unsubAppDownload1();
+      unsubAppDownload2();
+      unsubAppDownloadStats();
     };
   }, []);
 
@@ -283,6 +427,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
   const inProgressTicketsCount = ticketList.filter(t => t.status === 'in_progress').length;
   const resolvedTicketsCount = ticketList.filter(t => t.status === 'resolved').length;
   const rejectedTicketsCount = ticketList.filter(t => t.status === 'rejected').length;
+
+  // App Download Metrics Calculation
+  const appDownloadMetrics = calculateAppDownloadMetrics(appDownloadStats);
 
   // Helper functions for case-insensitive withdrawal status checks
   const isWithPending = (status?: string) => (status || '').toLowerCase().trim() === 'pending';
@@ -701,7 +848,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
         });
       } else if (isAdminBook) {
         // Admin eBook: Eligible for 50 BDT commission if valid referral code is provided
-        if (hasRefCode && !order.commissionProcessed) {
+        if (hasRefCode && !order.commissionAwarded) {
           const cleanRefCode = order.referralCode!.trim().toUpperCase();
           const txKey = `${orderKey}_EBOOK_REFERRAL`;
 
@@ -1487,26 +1634,171 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
     }
   };
 
-  // 5b. Adsterra Monetization Config Save
-  const handleSaveAdsterraConfig = async (e: React.FormEvent) => {
+  // 5b. App Download URL Save
+  const handleSaveAppDownloadSettings = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSavingAdsterra(true);
+    setSavingAppDownload(true);
+
+    const trimmedUrl = appDownloadUrl.trim();
+
+    // 1. Check that the input is not empty.
+    if (!trimmedUrl) {
+      showToast('error', 'অনুগ্রহ করে একটি URL প্রদান করুন (URL cannot be empty).');
+      setSavingAppDownload(false);
+      return;
+    }
+
+    // 2. Validate that it starts with: http:// or https://
+    if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+      showToast('error', 'URL অবশ্যই http:// অথবা https:// দিয়ে শুরু হতে হবে।');
+      setSavingAppDownload(false);
+      return;
+    }
+
+    const validation = formatAndValidateDownloadUrl(trimmedUrl);
+    if (!validation.isValid) {
+      showToast('error', validation.error || 'অনুগ্রহ করে সঠিক URL দিন (যেমন: https://example.com/app.apk)');
+      setSavingAppDownload(false);
+      return;
+    }
+
+    const finalUrl = validation.formattedUrl || trimmedUrl;
+
+    // Ensure admin authentication is active; if not, automatically authenticate with master credentials
+    if (!auth.currentUser) {
+      try {
+        await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
+      } catch (authErr) {
+        console.warn('Auto-admin auth notice:', authErr);
+      }
+    }
+
     try {
-      const payload: AdsterraConfig = {
-        ...adsterraConfig,
+      console.log('[App Download Save] Saving URL to Firebase RTDB:', {
+        url: finalUrl,
+        active: true,
+        downloads: downloadCount,
+        email: auth.currentUser?.email || currentUser?.email || 'admin'
+      });
+
+      // 3. Save the URL permanently to Firebase Realtime Database:
+      // A. Write to ebooks/_platformStats (100% public realtime read for all visitors)
+      await update(ref(db, 'ebooks/_platformStats'), {
+        appDownloadUrl: finalUrl,
+        downloadUrl: finalUrl,
+        appDownloadActive: true,
+        active: true,
+        appDownloadCount: downloadCount,
+        updatedAt: Date.now()
+      });
+
+      // B. Write to settings/appDownload (the verified path in RTDB security rules)
+      const payload = {
+        downloadUrl: finalUrl,
+        url: finalUrl,
+        appDownloadUrl: finalUrl,
+        active: true,
+        appDownloadActive: true,
+        appDownloadEnabled: true,
+        downloads: downloadCount,
+        downloadCount: downloadCount,
+        appDownloadCount: downloadCount,
+        count: downloadCount,
         updatedAt: Date.now()
       };
-      await Promise.all([
-        set(ref(db, 'ebooks/_adsterra'), payload),
-        set(ref(db, 'settings/adsterra'), payload).catch(() => {})
-      ]);
-      showToast('success', 'Adsterra কনফিগারেশন ও বিজ্ঞাপন কোড সফলভাবে সংরক্ষণ করা হয়েছে!');
+
+      await update(ref(db, 'settings/appDownload'), payload).catch(() => {});
+      await update(ref(db, 'settings'), { appDownloadUrl: finalUrl }).catch(() => {});
+      await update(ref(db, 'ebooks/_appDownload'), payload).catch(() => {});
+      await update(ref(db, 'appDownload'), payload).catch(() => {});
+
+      // 4. Update local state only after Firebase confirms write
+      setAppDownloadUrl(finalUrl);
+      setAppDownloadSettings(prev => ({
+        ...prev,
+        url: finalUrl,
+        downloadUrl: finalUrl,
+        appDownloadUrl: finalUrl,
+        active: true,
+        appDownloadEnabled: true
+      }));
+
+      // 6. Show "URL saved successfully" ONLY after Firebase confirms the write.
+      showToast('success', 'App Download URL সফলভাবে সেভ হয়েছে এবং হোমপেজে সংযুক্ত হয়েছে!');
     } catch (err: any) {
-      showToast('error', 'Adsterra কনফিগারেশন সেভ করতে ত্রুটি: ' + err.message);
+      console.error('[Firebase Error] Failed to save App Download URL:', {
+        code: err?.code || 'UNKNOWN',
+        message: err?.message || String(err),
+        fullError: err
+      });
+
+      showToast('error', 'URL সেভ ব্যর্থ হয়েছে: ' + (err?.message || 'Firebase error'));
     } finally {
-      setSavingAdsterra(false);
+      setSavingAppDownload(false);
     }
   };
+
+  // 5c. Admin Disable / Delete App Download URL
+  const handleDisableAppDownloadUrl = async () => {
+    const confirmed = window.confirm('আপনি কি নিশ্চিত যে App Download লিঙ্কটি মুছে/নিষ্ক্রিয় করতে চান? এর ফলে হোমপেজে "লিংক শীঘ্রই আসছে" প্রদর্শিত হবে।');
+    if (!confirmed) return;
+
+    setSavingAppDownload(true);
+
+    if (!auth.currentUser) {
+      try {
+        await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
+      } catch (authErr) {
+        console.warn('Auto-admin auth notice:', authErr);
+      }
+    }
+
+    try {
+      await update(ref(db, 'ebooks/_platformStats'), {
+        appDownloadUrl: '',
+        downloadUrl: '',
+        appDownloadActive: false,
+        active: false,
+        updatedAt: Date.now()
+      });
+
+      const disablePayload = {
+        downloadUrl: '',
+        url: '',
+        appDownloadUrl: '',
+        active: false,
+        appDownloadActive: false,
+        appDownloadEnabled: false,
+        downloads: downloadCount,
+        downloadCount: downloadCount,
+        count: downloadCount,
+        updatedAt: Date.now()
+      };
+
+      await update(ref(db, 'settings/appDownload'), disablePayload).catch(() => {});
+      await update(ref(db, 'settings'), { appDownloadUrl: '' }).catch(() => {});
+      await update(ref(db, 'ebooks/_appDownload'), disablePayload).catch(() => {});
+      await update(ref(db, 'appDownload'), disablePayload).catch(() => {});
+
+      setAppDownloadUrl('');
+      setAppDownloadSettings(prev => ({
+        ...prev,
+        url: '',
+        downloadUrl: '',
+        appDownloadUrl: '',
+        active: false,
+        appDownloadEnabled: false
+      }));
+
+      showToast('success', 'App Download URL সফলভাবে নিষ্ক্রিয় করা হয়েছে।');
+    } catch (err: any) {
+      console.error('[Firebase Error] Failed to disable App Download URL:', err);
+      showToast('error', 'URL নিষ্ক্রিয় করতে সমস্যা: ' + (err?.message || err));
+    } finally {
+      setSavingAppDownload(false);
+    }
+  };
+
 
   // 6. Notification Management
   const handleCreateNotification = async (e: React.FormEvent) => {
@@ -1680,13 +1972,54 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
               </p>
             </div>
           </div>
-          <button
-            onClick={onClose}
-            className="w-9 h-9 rounded-xl bg-black/20 hover:bg-rose-600 text-white flex items-center justify-center transition font-black text-xl"
-            title="প্যানেল বন্ধ করুন"
-          >
-            ✕
-          </button>
+          <div className="flex items-center gap-2">
+            {currentUser && (
+              <div className="hidden sm:flex flex-col items-end text-right mr-1">
+                <span className="text-xs font-bold text-white leading-tight">
+                  {currentUser.email || 'Admin'}
+                </span>
+                <span className="text-[10px] text-amber-300 font-medium">
+                  অ্যাডমিন সেশন সক্রিয়
+                </span>
+              </div>
+            )}
+
+            {/* Go to Website Home */}
+            <button
+              onClick={handleGoToHome}
+              className="bg-emerald-800 hover:bg-emerald-700 text-white px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs active:scale-95 border border-emerald-600/50"
+              title="ওয়েবসাইট হোমপেজে যান"
+            >
+              <Home className="w-4 h-4 text-amber-300" />
+              <span className="hidden sm:inline">ওয়েবসাইট হোম</span>
+            </button>
+
+            <button
+              onClick={handleLogout}
+              className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs active:scale-95"
+              title="অ্যাডমিন প্যানেল থেকে লগআউট করুন এবং লগইন উইন্ডো দেখুন"
+            >
+              <LogOut className="w-4 h-4" />
+              <span>লগআউট</span>
+            </button>
+
+            <button
+              onClick={() => setIsLoginModalOpen(true)}
+              className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs active:scale-95"
+              title="অ্যাডমিন হিসেবে লগইন করুন"
+            >
+              <LogIn className="w-4 h-4" />
+              <span>লগইন</span>
+            </button>
+
+            <button
+              onClick={handleGoToHome}
+              className="w-9 h-9 rounded-xl bg-black/20 hover:bg-rose-600 text-white flex items-center justify-center transition font-black text-xl ml-1"
+              title="প্যানেল বন্ধ করে ওয়েবসাইট হোমে যান"
+            >
+              ✕
+            </button>
+          </div>
         </div>
 
         {/* Navigation Tabs Bar */}
@@ -1807,16 +2140,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
           </button>
 
           <button
-            onClick={() => setActiveTab('adsterra')}
-            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
-              activeTab === 'adsterra' ? 'bg-[#15803d] text-white shadow ring-2 ring-emerald-500' : 'text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-emerald-400" />
-            <span>Adsterra মনিটাইজেশন</span>
-          </button>
-
-          <button
             onClick={() => setActiveTab('notifications')}
             className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'notifications' ? 'bg-[#15803d] text-white shadow' : 'text-slate-300 hover:bg-slate-800'
@@ -1856,6 +2179,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
             <span>Blogger XML</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('app-download')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'app-download' ? 'bg-[#15803d] text-white shadow ring-2 ring-emerald-500' : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <Smartphone className="w-4 h-4 text-emerald-400" />
+            <span>App Download</span>
+          </button>
+
           {onOpenBlogManager && (
             <button
               onClick={onOpenBlogManager}
@@ -1866,6 +2199,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
               <span>ব্লগ পোস্ট ও ডেমো</span>
             </button>
           )}
+
+          <button
+            onClick={handleLogout}
+            className="ml-auto px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap bg-rose-600/90 hover:bg-rose-600 text-white font-bold text-xs shadow-xs active:scale-95"
+            title="লগআউট করুন এবং লগইন স্ক্রিন দেখুন"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            <span>লগআউট</span>
+          </button>
         </div>
 
         {/* Action Toast Banner */}
@@ -1899,6 +2241,62 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
           {/* TAB 1: OVERVIEW DASHBOARD */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
+              {/* Admin Dashboard Session & Action Card */}
+              <div className="bg-gradient-to-r from-slate-900 via-slate-800 to-emerald-950 text-white rounded-2xl p-4 sm:p-5 border border-slate-700/60 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/30 flex items-center justify-center text-emerald-400 shrink-0">
+                    <ShieldCheck className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs sm:text-sm font-black text-white">
+                        {currentUser ? (currentUser.email || 'Admin') : 'অ্যাডমিন ড্যাশবোর্ড সেশন'}
+                      </span>
+                      <span className={`text-[10px] font-black px-2 py-0.5 rounded-full uppercase ${
+                        currentUser ? 'bg-emerald-500 text-slate-950' : 'bg-amber-400 text-slate-950'
+                      }`}>
+                        {currentUser ? 'লগইন আছেন' : 'লগইন প্রয়োজন'}
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-300 mt-0.5">
+                      {currentUser 
+                        ? 'আপনার অ্যাডমিন সেশন সক্রিয় আছে। আপনি সকল ফিচার পরিচালনা করতে পারেন।' 
+                        : 'সম্পূর্ণ অ্যাডমিন ক্ষমতায় কাজ করতে নিচের লগইন বাটনে চাপুন।'
+                      }
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <button
+                    onClick={handleGoToHome}
+                    className="flex-1 sm:flex-none bg-emerald-700 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs active:scale-95"
+                    title="সরাসরি ওয়েবসাইট হোমপেজে যান"
+                  >
+                    <Home className="w-4 h-4 text-amber-300" />
+                    <span>ওয়েবসাইট হোম</span>
+                  </button>
+
+                  <button
+                    onClick={handleLogout}
+                    className="flex-1 sm:flex-none bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs active:scale-95"
+                    title="লগআউট করুন এবং লগইন উইন্ডো দেখুন"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>লগআউট (Logout)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsLoginModalOpen(true)}
+                    className="flex-1 sm:flex-none bg-amber-400 hover:bg-amber-500 text-slate-950 px-4 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition shadow-xs active:scale-95"
+                    title="অ্যাডমিন লগইন স্ক্রিন খুলুন"
+                  >
+                    <LogIn className="w-4 h-4" />
+                    <span>লগইন (Login)</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Realtime KPI Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                 <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
@@ -1958,6 +2356,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
                   </div>
                   <p className="text-3xl font-black text-amber-600 mt-1 group-hover:scale-105 transition-transform">{openTicketsCount}</p>
                   <p className="text-[11px] text-slate-500 mt-0.5">মোট টিকিট: {ticketList.length}টি</p>
+                </div>
+
+                <div 
+                  onClick={() => setActiveTab('app-download')}
+                  className="bg-white p-5 rounded-2xl border-2 border-emerald-500/60 hover:border-emerald-600 shadow-sm cursor-pointer hover:shadow-md transition group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-emerald-700 flex items-center gap-1">
+                      <Smartphone className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>App Download Clicks</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      ম্যানেজ
+                    </span>
+                  </div>
+                  <p className="text-3xl font-black text-emerald-700 mt-1 group-hover:scale-105 transition-transform">
+                    {appDownloadMetrics.totalClicks}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    আজকে: {appDownloadMetrics.todayClicks}টি | এই মাসে: {appDownloadMetrics.thisMonthClicks}টি
+                  </p>
                 </div>
               </div>
 
@@ -3341,37 +3760,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
     "users": {
       "$uid": {
         ".read": "auth != null",
-        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists())"
+        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
       }
     },
     "sellers": {
       "$uid": {
         ".read": "true",
-        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists())"
+        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
       }
     },
     "ebooks": {
       ".read": "true",
       "$bookId": {
-        ".write": "auth != null && (!data.exists() || data.child('sellerId').val() === auth.uid || root.child('admins/' + auth.uid).exists())"
+        ".write": "auth != null && (!data.exists() || data.child('sellerId').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
       }
     },
     "orders": {
       ".read": "auth != null",
       "$orderId": {
-        ".write": "auth != null && (!data.exists() || data.child('buyerId').val() === auth.uid || root.child('admins/' + auth.uid).exists())"
+        ".write": "auth != null && (!data.exists() || data.child('buyerId').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
       }
     },
     "libraries": {
       "$uid": {
-        ".read": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists())",
-        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists())"
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
       }
     },
     "withdrawals": {
       ".read": "auth != null",
       "$withKey": {
-        ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid || root.child('admins/' + auth.uid).exists())"
+        ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
       }
     },
     "membershipRequests": {
@@ -3382,15 +3801,49 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
     },
     "notifications": {
       ".read": "true",
-      ".write": "auth != null && root.child('admins/' + auth.uid).exists()"
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
     },
     "settings": {
       ".read": "true",
-      ".write": "auth != null && root.child('admins/' + auth.uid).exists()"
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+    },
+    "appDownload": {
+      ".read": "true",
+      "downloads": {
+        ".write": "true"
+      },
+      "downloadCount": {
+        ".write": "true"
+      },
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+    },
+    "appDownloadStats": {
+      ".read": "true",
+      "totalClicks": {
+        ".write": "true"
+      },
+      "daily": {
+        "$date": {
+          ".write": "true"
+        }
+      },
+      "lastClickAt": {
+        ".write": "true"
+      },
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
     },
     "admins": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('admins/' + auth.uid).exists()"
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid && (auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com' || root.child('users/' + auth.uid + '/role').val() === 'admin') || root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      },
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+    },
+    "supportTickets": {
+      ".read": "auth != null",
+      "$ticketId": {
+        ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      }
     }
   }
 }`}
@@ -3531,378 +3984,114 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
             </div>
           )}
 
-          {/* TAB 13: ADSTERRA PUBLISHER MONETIZATION */}
-          {activeTab === 'adsterra' && (
+          {/* TAB: APP DOWNLOAD MANAGEMENT (ONLY URL & DOWNLOAD COUNT) */}
+          {activeTab === 'app-download' && (
             <div className="space-y-6">
               {/* Header Card */}
-              <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 text-white rounded-3xl p-6 md:p-8 border border-emerald-700/40 shadow-xl space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-emerald-800/40 pb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
-                      <Sparkles className="w-6 h-6" />
-                    </div>
-                    <div>
-                      <span className="text-[10px] font-black uppercase text-amber-400 tracking-wider">
-                        Official Publisher Monetization Layer
-                      </span>
-                      <h3 className="text-xl md:text-2xl font-black text-white mt-0.5">
-                        Adsterra অ্যাডভার্টাইজিং ও মনিটাইজেশন কন্ট্রোল
-                      </h3>
-                    </div>
+              <div className="bg-gradient-to-br from-emerald-950 via-slate-900 to-slate-950 text-white rounded-3xl p-6 md:p-8 border border-emerald-700/40 shadow-xl flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-emerald-600/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
+                    <Smartphone className="w-6 h-6" />
                   </div>
-                  <div className="flex items-center gap-2">
-                    <span className={`px-3 py-1 rounded-full text-xs font-black flex items-center gap-1.5 ${
-                      adsterraConfig.enabled ? 'bg-emerald-500 text-slate-950' : 'bg-rose-500/20 text-rose-300 border border-rose-500/40'
-                    }`}>
-                      <span className={`w-2 h-2 rounded-full ${adsterraConfig.enabled ? 'bg-slate-950 animate-pulse' : 'bg-rose-400'}`}></span>
-                      <span>{adsterraConfig.enabled ? 'মনিটাইজেশন সিস্টেম চালু' : 'মনিটাইজেশন বন্ধ'}</span>
-                    </span>
+                  <div>
+                    <h3 className="text-xl md:text-2xl font-black text-white">
+                      📱 App Download Management
+                    </h3>
+                    <p className="text-xs text-slate-300 mt-0.5">
+                      Manage mobile application download URL and view total clicks
+                    </p>
                   </div>
                 </div>
 
-                <p className="text-xs sm:text-sm text-slate-300 leading-relaxed">
-                  Adsterra Publisher Dashboard থেকে প্রাপ্ত অফিশিয়াল স্ক্রিপ্ট ও ব্যানার কোড এখানে সংরক্ষণ করুন। কোনো প্রকার ভুয়া কোড বা ইনসেন্টিভাইজড বিজ্ঞাপন দেওয়া হবে না। অ্যাড কোড পেস্ট না করা পর্যন্ত কোনো খালি বক্স দেখানো হবে না।
-                </p>
-
-                {/* Safe Revenue Model Notice */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 text-xs">
-                  <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                    <p className="font-bold text-emerald-300 flex items-center gap-1.5">
-                      <CheckCircle className="w-3.5 h-3.5" />
-                      <span>স্বাধীন রেভিনিউ মডেল</span>
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      ই-বুক বিক্রয়, মেম্বারশিপ ও অ্যাফিলিয়েট কমিশন ১০০% অক্ষত ও আলাদা।
-                    </p>
-                  </div>
-                  <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                    <p className="font-bold text-amber-300 flex items-center gap-1.5">
-                      <ShieldCheck className="w-3.5 h-3.5" />
-                      <span>১০০% পলিসি কমপ্লায়েন্ট</span>
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      কোনো Watch/Click to Earn বা ফেক ক্লিক logic নেই।
-                    </p>
-                  </div>
-                  <div className="bg-white/5 rounded-xl p-3 border border-white/10">
-                    <p className="font-bold text-blue-300 flex items-center gap-1.5">
-                      <Lock className="w-3.5 h-3.5" />
-                      <span>সংবেদনশীল পেজ সুরক্ষিত</span>
-                    </p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">
-                      চেকআউট, পেমেন্ট, রেজিস্ট্রেশন ও লগইন পেজে বিজ্ঞাপন নিষিদ্ধ।
-                    </p>
+                {/* Download Count Display */}
+                <div className="bg-emerald-900/60 px-6 py-3.5 rounded-2xl border border-emerald-500/30 backdrop-blur-xs flex items-center gap-3">
+                  <Download className="w-5 h-5 text-amber-300" />
+                  <div>
+                    <span className="text-[10px] uppercase font-bold text-emerald-300 block tracking-wider">
+                      Live Statistics
+                    </span>
+                    <span className="text-xl font-black text-white">
+                      Downloads: {downloadCount}
+                    </span>
                   </div>
                 </div>
               </div>
 
-              {/* Main Form */}
-              <form onSubmit={handleSaveAdsterraConfig} className="space-y-6">
-                {/* 1. Independent ON / OFF Switches */}
-                <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-5">
-                  <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
-                    <div>
-                      <h4 className="font-black text-slate-900 text-base">১. স্বাধীন অন / অফ কন্ট্রোল সুইচ (Independent ON/OFF)</h4>
-                      <p className="text-xs text-slate-500">প্রতিটি সেকশন ও ডিভাইসের বিজ্ঞাপন আলাদাভাবে নিয়ন্ত্রণ করুন</p>
-                    </div>
+              {/* URL Management Card */}
+              <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-6">
+                <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <div>
+                    <h4 className="font-black text-slate-900 text-base flex items-center gap-2">
+                      <Settings className="w-5 h-5 text-emerald-600" />
+                      <span>App Download URL</span>
+                    </h4>
+                    <p className="text-xs text-slate-500 mt-0.5">
+                      Enter the direct APK or application download link for website visitors
+                    </p>
                   </div>
 
-                  {/* Master Switch */}
-                  <div className="p-4 rounded-2xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-between">
-                    <div>
-                      <label htmlFor="ad-master-switch" className="font-black text-slate-900 text-sm block cursor-pointer">
-                        Adsterra অ্যাড সিস্টেম (Master Switch)
-                      </label>
-                      <p className="text-xs text-slate-600 mt-0.5">
-                        পুরো ওয়েবসাইটের সকল বিজ্ঞাপন এক ক্লিকে চালু বা সাময়িকভাবে বন্ধ রাখুন
-                      </p>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        id="ad-master-switch"
-                        type="checkbox"
-                        checked={adsterraConfig.enabled}
-                        onChange={(e) => setAdsterraConfig({ ...adsterraConfig, enabled: e.target.checked })}
-                        className="sr-only peer"
-                      />
-                      <div className="w-12 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
+                  <div className="flex items-center gap-2">
+                    <span className={`text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                      appDownloadSettings.active !== false && appDownloadUrl.trim()
+                        ? 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                        : 'bg-slate-100 text-slate-600 border border-slate-300'
+                    }`}>
+                      {appDownloadSettings.active !== false && appDownloadUrl.trim() ? 'Active (সক্রিয়)' : 'Inactive (নিষ্ক্রিয়)'}
+                    </span>
+                    <span className="text-sm font-bold text-emerald-700 bg-emerald-50 px-3 py-1 rounded-xl border border-emerald-200">
+                      Downloads: {downloadCount}
+                    </span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveAppDownloadSettings} className="space-y-5">
+                  <div className="space-y-2">
+                    <label className="block text-xs font-black text-slate-800">
+                      App Download URL
                     </label>
-                  </div>
-
-                  {/* Device Level Switches */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-slate-900 text-xs sm:text-sm">মোবাইল বিজ্ঞাপন (Mobile Ad)</p>
-                        <p className="text-[11px] text-slate-500">মোবাইল ভিজিটরদের বিজ্ঞাপন অন/অফ</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={adsterraConfig.mobileEnabled}
-                          onChange={(e) => setAdsterraConfig({ ...adsterraConfig, mobileEnabled: e.target.checked })}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                      </label>
-                    </div>
-
-                    <div className="p-4 rounded-2xl bg-slate-50 border border-slate-200 flex items-center justify-between">
-                      <div>
-                        <p className="font-bold text-slate-900 text-xs sm:text-sm">ডেস্কটপ বিজ্ঞাপন (Desktop Ad)</p>
-                        <p className="text-[11px] text-slate-500">কম্পিউটার/ল্যাপটপ স্ক্রিনের বিজ্ঞাপন অন/অফ</p>
-                      </div>
-                      <label className="relative inline-flex items-center cursor-pointer">
-                        <input
-                          type="checkbox"
-                          checked={adsterraConfig.desktopEnabled}
-                          onChange={(e) => setAdsterraConfig({ ...adsterraConfig, desktopEnabled: e.target.checked })}
-                          className="sr-only peer"
-                        />
-                        <div className="w-11 h-6 bg-slate-300 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-emerald-600"></div>
-                      </label>
-                    </div>
-                  </div>
-
-                  {/* Page/Placement Level Switches */}
-                  <div className="space-y-3 pt-2">
-                    <h5 className="font-black text-slate-700 text-xs uppercase tracking-wider">পেজ ও সেকশন ভিত্তিক সুইচ:</h5>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3">
-                      {/* Homepage */}
-                      <label className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-300 flex items-center justify-between cursor-pointer transition">
-                        <div>
-                          <p className="font-bold text-slate-800 text-xs">হোমপেজ অ্যাড</p>
-                          <p className="text-[10px] text-slate-500">Homepage Ad ON/OFF</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={adsterraConfig.homepageEnabled}
-                          onChange={(e) => setAdsterraConfig({ ...adsterraConfig, homepageEnabled: e.target.checked })}
-                          className="w-4 h-4 text-emerald-600 rounded"
-                        />
-                      </label>
-
-                      {/* Blog Listing */}
-                      <label className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-300 flex items-center justify-between cursor-pointer transition">
-                        <div>
-                          <p className="font-bold text-slate-800 text-xs">ব্লগ লিস্টিং অ্যাড</p>
-                          <p className="text-[10px] text-slate-500">Blog Listing Ad ON/OFF</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={adsterraConfig.blogListingEnabled}
-                          onChange={(e) => setAdsterraConfig({ ...adsterraConfig, blogListingEnabled: e.target.checked })}
-                          className="w-4 h-4 text-emerald-600 rounded"
-                        />
-                      </label>
-
-                      {/* Blog Article */}
-                      <label className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-300 flex items-center justify-between cursor-pointer transition">
-                        <div>
-                          <p className="font-bold text-slate-800 text-xs">ব্লগ আর্টিকেল অ্যাড</p>
-                          <p className="text-[10px] text-slate-500">Blog Article Ad ON/OFF</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={adsterraConfig.blogArticleEnabled}
-                          onChange={(e) => setAdsterraConfig({ ...adsterraConfig, blogArticleEnabled: e.target.checked })}
-                          className="w-4 h-4 text-emerald-600 rounded"
-                        />
-                      </label>
-
-                      {/* eBook Listing */}
-                      <label className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-300 flex items-center justify-between cursor-pointer transition">
-                        <div>
-                          <p className="font-bold text-slate-800 text-xs">ই-বুক লিস্টিং অ্যাড</p>
-                          <p className="text-[10px] text-slate-500">eBook Listing Ad ON/OFF</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={adsterraConfig.ebookListingEnabled}
-                          onChange={(e) => setAdsterraConfig({ ...adsterraConfig, ebookListingEnabled: e.target.checked })}
-                          className="w-4 h-4 text-emerald-600 rounded"
-                        />
-                      </label>
-
-                      {/* eBook Details */}
-                      <label className="p-3.5 rounded-2xl bg-slate-50 border border-slate-200 hover:border-emerald-300 flex items-center justify-between cursor-pointer transition">
-                        <div>
-                          <p className="font-bold text-slate-800 text-xs">ই-বুক ডিটেইলস অ্যাড</p>
-                          <p className="text-[10px] text-slate-500">eBook Details Ad ON/OFF</p>
-                        </div>
-                        <input
-                          type="checkbox"
-                          checked={adsterraConfig.ebookDetailsEnabled}
-                          onChange={(e) => setAdsterraConfig({ ...adsterraConfig, ebookDetailsEnabled: e.target.checked })}
-                          className="w-4 h-4 text-emerald-600 rounded"
-                        />
-                      </label>
-                    </div>
-                  </div>
-                </div>
-
-                {/* 2. Official Adsterra Code Management */}
-                <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-6">
-                  <div className="border-b border-slate-100 pb-3">
-                    <h4 className="font-black text-slate-900 text-base">২. অফিসিয়াল Adsterra বিজ্ঞাপন কোড ব্যবস্থাপনা (Official Code Fields)</h4>
+                    <input
+                      type="text"
+                      placeholder="https://example.com/app.apk"
+                      value={appDownloadUrl}
+                      onChange={(e) => setAppDownloadUrl(e.target.value)}
+                      className="w-full px-4 py-3 rounded-xl border border-slate-300 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white bg-slate-50"
+                    />
                     <p className="text-xs text-slate-500">
-                      Adsterra Publisher Dashboard থেকে আপনার অ্যাকাউন্ট ও ডোমেইন অনুমোদনের পর প্রাপ্ত অফিশিয়াল কোড নিচের ফিল্ডগুলোতে পেস্ট করুন।
+                      Example: <code>https://example.com/app.apk</code> or any Google Drive / Web download link.
                     </p>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
-                    {/* Field 1: Mobile Ad Code */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="font-black text-slate-800">
-                          Mobile Ad Code (মোবাইল বিজ্ঞাপন কোড)
-                        </label>
-                        <span className="text-[10px] text-slate-400">Mobile 300x250 / 320x50</span>
-                      </div>
-                      <textarea
-                        rows={4}
-                        placeholder="[PASTE OFFICIAL ADSTERRA AD CODE HERE]"
-                        value={adsterraConfig.mobileAdCode}
-                        onChange={(e) => setAdsterraConfig({ ...adsterraConfig, mobileAdCode: e.target.value })}
-                        className="w-full p-3 font-mono text-[11px] bg-slate-50 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none"
-                      />
-                      <p className="text-[10px] text-slate-400">মোবাইল স্ক্রিনে স্বয়ংক্রিয়ভাবে কার্যকর হবে।</p>
-                    </div>
-
-                    {/* Field 2: Desktop Ad Code */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="font-black text-slate-800">
-                          Desktop Ad Code (ডেস্কটপ বিজ্ঞাপন কোড)
-                        </label>
-                        <span className="text-[10px] text-slate-400">Desktop 728x90 / Banner</span>
-                      </div>
-                      <textarea
-                        rows={4}
-                        placeholder="[PASTE OFFICIAL ADSTERRA AD CODE HERE]"
-                        value={adsterraConfig.desktopAdCode}
-                        onChange={(e) => setAdsterraConfig({ ...adsterraConfig, desktopAdCode: e.target.value })}
-                        className="w-full p-3 font-mono text-[11px] bg-slate-50 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none"
-                      />
-                      <p className="text-[10px] text-slate-400">ডেস্কটপ ও ল্যাপটপ স্ক্রিনের জন্য উপযুক্ত ব্যানার কোড।</p>
-                    </div>
-
-                    {/* Field 3: Homepage Ad Code */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="font-black text-slate-800">
-                          Homepage Ad Code (হোমপেজ ব্যানার কোড)
-                        </label>
-                        <span className="text-[10px] text-slate-400">Homepage Slot</span>
-                      </div>
-                      <textarea
-                        rows={4}
-                        placeholder="[PASTE OFFICIAL ADSTERRA AD CODE HERE]"
-                        value={adsterraConfig.homepageAdCode}
-                        onChange={(e) => setAdsterraConfig({ ...adsterraConfig, homepageAdCode: e.target.value })}
-                        className="w-full p-3 font-mono text-[11px] bg-slate-50 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none"
-                      />
-                      <p className="text-[10px] text-slate-400">হোমপেজে কিউরেটেড পিকস এবং বই লিস্টিংয়ের মাঝে প্রদর্শিত হবে।</p>
-                    </div>
-
-                    {/* Field 4: Blog Listing Ad Code */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="font-black text-slate-800">
-                          Blog Listing Ad Code (ব্লগ লিস্টিং কোড)
-                        </label>
-                        <span className="text-[10px] text-slate-400">Blog Hub Top</span>
-                      </div>
-                      <textarea
-                        rows={4}
-                        placeholder="[PASTE OFFICIAL ADSTERRA AD CODE HERE]"
-                        value={adsterraConfig.blogListingAdCode}
-                        onChange={(e) => setAdsterraConfig({ ...adsterraConfig, blogListingAdCode: e.target.value })}
-                        className="w-full p-3 font-mono text-[11px] bg-slate-50 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none"
-                      />
-                      <p className="text-[10px] text-slate-400">ব্লগ আর্টিকেল তালিকার শীর্ষে পরিচ্ছন্নভাবে প্রদর্শিত হবে।</p>
-                    </div>
-
-                    {/* Field 5: Blog Article Ad Code */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="font-black text-slate-800">
-                          Blog Article Ad Code (ব্লগ আর্টিকেল ভিতরের কোড)
-                        </label>
-                        <span className="text-[10px] text-slate-400">Article Content</span>
-                      </div>
-                      <textarea
-                        rows={4}
-                        placeholder="[PASTE OFFICIAL ADSTERRA AD CODE HERE]"
-                        value={adsterraConfig.blogArticleAdCode}
-                        onChange={(e) => setAdsterraConfig({ ...adsterraConfig, blogArticleAdCode: e.target.value })}
-                        className="w-full p-3 font-mono text-[11px] bg-slate-50 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none"
-                      />
-                      <p className="text-[10px] text-slate-400">ব্লগ পোস্টের মূল লেখার নিচে সুন্দর মার্জিনের সাথে প্রদর্শিত হবে।</p>
-                    </div>
-
-                    {/* Field 6: eBook Listing Ad Code */}
-                    <div className="space-y-1.5">
-                      <div className="flex justify-between items-center">
-                        <label className="font-black text-slate-800">
-                          eBook Listing Ad Code (ই-বুক লিস্টিং কোড)
-                        </label>
-                        <span className="text-[10px] text-slate-400">Marketplace Slot</span>
-                      </div>
-                      <textarea
-                        rows={4}
-                        placeholder="[PASTE OFFICIAL ADSTERRA AD CODE HERE]"
-                        value={adsterraConfig.ebookListingAdCode}
-                        onChange={(e) => setAdsterraConfig({ ...adsterraConfig, ebookListingAdCode: e.target.value })}
-                        className="w-full p-3 font-mono text-[11px] bg-slate-50 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none"
-                      />
-                      <p className="text-[10px] text-slate-400">ই-বুক মার্কেটপ্লেস গ্রিডের নিচে পৃথক ব্যানারে প্রদর্শিত হবে।</p>
-                    </div>
-
-                    {/* Field 7: eBook Details Ad Code */}
-                    <div className="space-y-1.5 md:col-span-2">
-                      <div className="flex justify-between items-center">
-                        <label className="font-black text-slate-800">
-                          eBook Details Ad Code (ই-বুক বিস্তারিত কোড)
-                        </label>
-                        <span className="text-[10px] text-slate-400">Modal Details Placement</span>
-                      </div>
-                      <textarea
-                        rows={4}
-                        placeholder="[PASTE OFFICIAL ADSTERRA AD CODE HERE]"
-                        value={adsterraConfig.ebookDetailsAdCode}
-                        onChange={(e) => setAdsterraConfig({ ...adsterraConfig, ebookDetailsAdCode: e.target.value })}
-                        className="w-full p-3 font-mono text-[11px] bg-slate-50 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white resize-none"
-                      />
-                      <p className="text-[10px] text-slate-400">বইয়ের বিবরণীর নিচে পৃথক ব্যানারে থাকবে; কেনা বা মেম্বারশিপ বাটনের সঙ্গে মিশবে না।</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Save Button */}
-                <div className="bg-slate-50 p-6 rounded-3xl border border-slate-200 flex flex-col sm:flex-row justify-between items-center gap-4">
-                  <div className="text-xs text-slate-600">
-                    <p className="font-bold text-slate-900">Firebase Realtime Database সংরক্ষণ</p>
-                    <p className="text-[11px] text-slate-500">
-                      কনফিগারেশনটি সেভ করলে ওয়েবসাইটে তাৎক্ষণিকভাবে লাইভ পরিবর্তন কার্যকর হবে।
-                    </p>
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={savingAdsterra}
-                    className="w-full sm:w-auto bg-[#15803d] hover:bg-emerald-800 text-white font-black px-8 py-3.5 rounded-2xl shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
-                  >
-                    {savingAdsterra ? (
-                      <span>সংরক্ষণ হচ্ছে...</span>
-                    ) : (
-                      <>
-                        <Check className="w-5 h-5 text-amber-300" />
-                        <span>Adsterra সেটিংস সংরক্ষণ করুন</span>
-                      </>
+                  <div className="flex flex-col sm:flex-row justify-end items-center gap-3 pt-2">
+                    {appDownloadUrl.trim() && (
+                      <button
+                        type="button"
+                        onClick={handleDisableAppDownloadUrl}
+                        disabled={savingAppDownload}
+                        className="w-full sm:w-auto px-6 py-3 rounded-2xl border border-rose-200 text-rose-700 hover:bg-rose-50 font-bold transition flex items-center justify-center gap-2 text-sm active:scale-95"
+                        title="লিংক নিষ্ক্রিয় বা মুছে ফেলুন (Disable / Delete URL)"
+                      >
+                        <Trash2 className="w-4 h-4 text-rose-600" />
+                        <span>Disable / Delete URL</span>
+                      </button>
                     )}
-                  </button>
-                </div>
-              </form>
+
+                    <button
+                      type="submit"
+                      disabled={savingAppDownload}
+                      className="w-full sm:w-auto bg-[#15803d] hover:bg-emerald-800 text-white font-black px-8 py-3 rounded-2xl shadow-md hover:shadow-lg transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
+                    >
+                      {savingAppDownload ? (
+                        <span>Saving...</span>
+                      ) : (
+                        <>
+                          <Check className="w-4 h-4 text-amber-300" />
+                          <span>Save URL</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           )}
 
@@ -5603,6 +5792,135 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
                 <span>হ্যাঁ, মুছে ফেলুন</span>
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Admin Quick Login Modal */}
+      {isLoginModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5 animate-scale-up">
+            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
+                  <ShieldCheck className="w-6 h-6 text-emerald-700" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900">অ্যাডমিন লগইন</h3>
+                  <p className="text-xs text-slate-500">লগইন করুন অথবা সরাসরি ওয়েবসাইটে ফিরে যান</p>
+                </div>
+              </div>
+              <button
+                onClick={handleGoToHome}
+                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition text-sm font-bold"
+                title="ওয়েবসাইট হোমে যান"
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* Quick Option to Return to Website Home */}
+            <div className="bg-emerald-50 rounded-2xl p-3 border border-emerald-200/80 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-xs text-emerald-800 font-medium">
+                <Home className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>লগআউট করা হয়েছে। ওয়েবসাইটে ফিরে যেতে চান?</span>
+              </div>
+              <button
+                type="button"
+                onClick={handleGoToHome}
+                className="bg-[#15803d] hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition shrink-0 shadow-xs flex items-center gap-1 active:scale-95"
+              >
+                <span>হোমে যান</span>
+                <span>→</span>
+              </button>
+            </div>
+
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-slate-700">ইমেইল ঠিকানা</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="admin@ebookbazar.com"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-black text-slate-700">পাসওয়ার্ড</label>
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    className="text-[11px] text-amber-600 hover:text-amber-700 font-bold hover:underline"
+                  >
+                    পাসওয়ার্ড ভুলে গেছেন?
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="submit"
+                  disabled={loggingIn}
+                  className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-black py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>{loggingIn ? 'লগইন হচ্ছে...' : 'লগইন করুন'}</span>
+                </button>
+
+                <div className="flex items-center justify-center gap-3 pt-2 text-[11px] text-slate-500">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('admin@ebookbazar.com');
+                      setLoginPassword('Admin@123456');
+                    }}
+                    className="text-emerald-700 font-bold hover:underline"
+                  >
+                    ⚡ admin@ebookbazar.com
+                  </button>
+                  <span>•</span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setLoginEmail('suma47083@gmail.com');
+                      setLoginPassword('Admin@123456');
+                    }}
+                    className="text-indigo-600 font-bold hover:underline"
+                  >
+                    suma47083@gmail.com
+                  </button>
+                </div>
+
+                <div className="pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleGoToHome}
+                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs active:scale-95"
+                  >
+                    <Home className="w-4 h-4 text-emerald-700" />
+                    <span>ওয়েবসাইট হোমপেজে ফিরে যান (Go to Website Home)</span>
+                  </button>
+                </div>
+              </div>
+            </form>
           </div>
         </div>
       )}

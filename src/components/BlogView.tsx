@@ -17,7 +17,6 @@ import {
   Tag
 } from 'lucide-react';
 import { BlogPost, Ebook } from '../types';
-import { AdsterraSlot } from './AdsterraSlot';
 
 interface BlogViewProps {
   posts: BlogPost[];
@@ -125,9 +124,6 @@ export const BlogView: React.FC<BlogViewProps> = ({
           </div>
         </div>
 
-        {/* Safe Ad Placement Area: Article Top (Official Adsterra code) */}
-        <AdsterraSlot placement="blogArticle" className="my-2" />
-
         {/* Full Blog Post Content Card */}
         <article className="bg-white rounded-3xl p-6 sm:p-8 md:p-10 border border-slate-200 shadow-sm space-y-8">
           {/* Category & Labels */}
@@ -218,9 +214,6 @@ export const BlogView: React.FC<BlogViewProps> = ({
               </div>
             )}
           </div>
-
-          {/* Safe Ad Placement Area: Inside Article Content (Official Adsterra code) */}
-          <AdsterraSlot placement="blogArticle" className="my-6" />
 
           {/* Call to Action Banner inside Post */}
           <div className="bg-gradient-to-r from-emerald-900 to-slate-900 text-white p-6 sm:p-8 rounded-3xl shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-5">
@@ -352,9 +345,6 @@ export const BlogView: React.FC<BlogViewProps> = ({
         </div>
       </div>
 
-      {/* Safe Ad Placement Area: Blog Listing Top (Official Adsterra code) */}
-      <AdsterraSlot placement="blogListing" className="my-2" />
-
       {/* Blog Posts Grid */}
       {filteredPosts.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-4">
@@ -484,9 +474,6 @@ export const BlogView: React.FC<BlogViewProps> = ({
           })}
         </div>
       )}
-
-      {/* Safe Ad Placement Area: Blog Listing Bottom (Reserved for official Adsterra code) */}
-      <div id="adsterra-blog-listing-bottom" className="w-full text-center empty:hidden" aria-hidden="true" />
     </div>
   );
 };

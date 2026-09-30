@@ -47,7 +47,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     sellerName: directItem.sellerName,
     sellerEmail: directItem.sellerEmail,
     sellerReferralCode: directItem.sellerReferralCode,
-    isSeller: directItem.isSeller ?? false,
+    isSeller: Boolean(
+      directItem.isSeller === true || 
+      (directItem.sellerId && directItem.sellerId !== 'ADMIN' && directItem.sellerId !== 'admin')
+    ),
   }] : cart.map(i => ({
     id: i.id,
     title: i.title,
@@ -57,7 +60,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     sellerName: i.sellerName,
     sellerEmail: i.sellerEmail,
     sellerReferralCode: i.sellerReferralCode,
-    isSeller: i.isSeller ?? false,
+    isSeller: Boolean(
+      i.isSeller === true || 
+      (i.sellerId && i.sellerId !== 'ADMIN' && i.sellerId !== 'admin')
+    ),
   }));
 
   const calculatedTotal = directItem 

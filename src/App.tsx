@@ -48,10 +48,9 @@ import { RealWebsiteStats } from './components/RealWebsiteStats';
 import { CuratedPicksSection } from './components/CuratedPicksSection';
 import { FloatingSearch } from './components/FloatingSearch';
 import { LiveChatWidget } from './components/LiveChatWidget';
-import { AdsterraSlot } from './components/AdsterraSlot';
-import { AdsterraProvider } from './context/AdsterraContext';
+import { AppDownloadBanner } from './components/AppDownloadBanner';
 import { extractBloggerPostsFromDOM, fetchBloggerFeedPosts, setHideDemoBlogsSetting } from './services/blogService';
-import { Ebook, BlogPost } from './types';
+import { Ebook, BlogPost, AppDownloadSettings, DEFAULT_APP_DOWNLOAD_SETTINGS } from './types';
 import { INITIAL_EBOOKS } from './data/initialEbooks';
 import { BLOG_POSTS } from './data/blogPosts';
 import { db, ref, onValue, set, update } from './firebase';
@@ -114,6 +113,9 @@ function MainApp() {
   const [totalUsersCount, setTotalUsersCount] = useState<number>(17);
   const [totalSellersCount, setTotalSellersCount] = useState<number>(7);
 
+  // App Download Settings from Realtime Database
+  const [appDownloadSettings, setAppDownloadSettings] = useState<AppDownloadSettings>(DEFAULT_APP_DOWNLOAD_SETTINGS);
+
   // Listen to Realtime counts of users and sellers from public _platformStats
   useEffect(() => {
     // 1. Public realtime stats (works for all visitors without auth barrier)
@@ -123,6 +125,21 @@ function MainApp() {
         const val = snap.val();
         if (val && typeof val.totalUsers === 'number') setTotalUsersCount(val.totalUsers);
         if (val && typeof val.totalSellers === 'number') setTotalSellersCount(val.totalSellers);
+
+        // Instant real-time public App Download sync without auth barrier
+        if (val && (val.appDownloadUrl || val.downloadUrl || typeof val.appDownloadActive === 'boolean')) {
+          const directUrl = (val.appDownloadUrl || val.downloadUrl || '').trim();
+          const isActive = val.active !== false && val.appDownloadActive !== false && Boolean(directUrl);
+          setAppDownloadSettings(prev => ({
+            ...prev,
+            url: directUrl,
+            downloadUrl: directUrl,
+            appDownloadUrl: directUrl,
+            active: isActive,
+            appDownloadEnabled: isActive,
+            downloads: Number(val.appDownloadCount ?? val.downloads ?? val.downloadCount ?? prev.downloads ?? 0)
+          }));
+        }
       }
     });
 
@@ -153,10 +170,52 @@ function MainApp() {
       }
     }, () => {});
 
+    // Listen to App Download Settings from Realtime Database (Checks both 'appDownload' and 'settings/appDownload')
+    const handleDownloadSnap = (snap: any) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val) {
+          if (typeof val === 'string') {
+            const raw = val.trim();
+            setAppDownloadSettings(prev => ({
+              ...prev,
+              url: raw,
+              downloadUrl: raw,
+              appDownloadUrl: raw,
+              active: Boolean(raw),
+              appDownloadEnabled: Boolean(raw)
+            }));
+          } else if (typeof val === 'object') {
+            const resolvedUrl = (val.downloadUrl || val.url || val.appDownloadUrl || val.app_download_url || '').trim();
+            const isActive = val.active !== false && val.appDownloadEnabled !== false && Boolean(resolvedUrl);
+            setAppDownloadSettings(prev => ({
+              ...prev,
+              ...val,
+              url: resolvedUrl,
+              downloadUrl: resolvedUrl,
+              appDownloadUrl: resolvedUrl,
+              active: isActive,
+              appDownloadEnabled: isActive,
+              downloads: Number(val.downloads ?? val.downloadCount ?? val.count ?? 0)
+            }));
+          }
+        }
+      }
+    };
+
+    const unsubAppDownload0 = onValue(ref(db, 'ebooks/_appDownload'), handleDownloadSnap, () => {});
+    const unsubAppDownload1 = onValue(ref(db, 'appDownload'), handleDownloadSnap, () => {});
+    const unsubAppDownload2 = onValue(ref(db, 'settings/appDownload'), (snap) => {
+      if (snap.exists()) handleDownloadSnap(snap);
+    }, () => {});
+
     return () => {
       unsubStats();
       unsubUsers();
       unsubSellers();
+      unsubAppDownload0();
+      unsubAppDownload1();
+      unsubAppDownload2();
     };
   }, []);
   
@@ -419,6 +478,15 @@ function MainApp() {
         {/* VIEW 1: HOME MARKETPLACE */}
         {currentView === 'home' && (
           <div className="space-y-6 md:space-y-8 animate-soft-fade-in">
+            {/* Frontend App Download Section (Header-এর ঠিক নিচে ও Homepage-এর মূল কন্টেন্ট শুরুর আগে) */}
+            <AppDownloadBanner
+              title={appDownloadSettings.appDownloadTitle}
+              text={appDownloadSettings.appDownloadText}
+              url={appDownloadSettings.downloadUrl || appDownloadSettings.url || appDownloadSettings.appDownloadUrl || ''}
+              active={appDownloadSettings.active !== false && appDownloadSettings.appDownloadEnabled !== false}
+              enabled={appDownloadSettings.active !== false && appDownloadSettings.appDownloadEnabled !== false}
+            />
+
             {/* 1. Existing Slideshow / Hero Banner (Preserved layout, rounded corners, subtle shadow) */}
             <div className="pt-1">
               <ImageSlideshow />
@@ -486,9 +554,6 @@ function MainApp() {
               onViewDetails={(book) => setSelectedEbook(book)}
               onBuyNow={handleBuyNow}
             />
-
-            {/* Limited Responsive Adsterra Placement for Homepage */}
-            <AdsterraSlot placement="homepage" />
 
             {/* 6. জনপ্রিয় বিভাগ ও ফিল্টার সার্চ */}
             <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200/80 space-y-6">
@@ -627,9 +692,6 @@ function MainApp() {
                   ))}
                 </div>
               )}
-
-              {/* Limited Responsive Adsterra Placement for eBook Listing */}
-              <AdsterraSlot placement="ebookListing" />
             </div>
 
             {/* 8. সর্বশেষ লেখা (Featured Real Blog Posts Section on Home, exactly 3 latest articles) */}
@@ -1228,7 +1290,16 @@ function MainApp() {
       {/* MODAL 4: ADMIN PANEL */}
       {isAdminOpen && (
         <AdminPanel
-          onClose={() => setIsAdminOpen(false)}
+          onClose={() => {
+            setIsAdminOpen(false);
+            setCurrentView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+          onNavigateHome={() => {
+            setIsAdminOpen(false);
+            setCurrentView('home');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
           onOpenReader={handleOpenPdfReader}
           onOpenBlogManager={() => setIsAdminBlogManagerOpen(true)}
         />
@@ -1293,9 +1364,7 @@ export default function App() {
   return (
     <AuthProvider>
       <CartProvider>
-        <AdsterraProvider>
-          <MainApp />
-        </AdsterraProvider>
+        <MainApp />
       </CartProvider>
     </AuthProvider>
   );

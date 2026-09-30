@@ -1,0 +1,90 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      }
+    },
+    "sellers": {
+      "$uid": {
+        ".read": "true",
+        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      }
+    },
+    "ebooks": {
+      ".read": "true",
+      "$bookId": {
+        ".write": "auth != null && (!data.exists() || data.child('sellerId').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      }
+    },
+    "orders": {
+      ".read": "auth != null",
+      "$orderId": {
+        ".write": "auth != null && (!data.exists() || data.child('buyerId').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      }
+    },
+    "libraries": {
+      "$uid": {
+        ".read": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')",
+        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      }
+    },
+    "withdrawals": {
+      ".read": "auth != null",
+      "$withKey": {
+        ".write": "auth != null && (!data.exists() || data.child('uid').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      }
+    },
+    "membershipRequests": {
+      ".read": "auth != null",
+      "$reqKey": {
+        ".write": "auth != null"
+      }
+    },
+    "notifications": {
+      ".read": "true",
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+    },
+    "settings": {
+      ".read": "true",
+      "appDownload": {
+        "downloadCount": {
+          ".write": "true"
+        },
+        "count": {
+          ".write": "true"
+        }
+      },
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+    },
+    "appDownloadStats": {
+      ".read": "true",
+      "totalClicks": {
+        ".write": "true"
+      },
+      "daily": {
+        "$date": {
+          ".write": "true"
+        }
+      },
+      "lastClickAt": {
+        ".write": "true"
+      },
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+    },
+    "admins": {
+      ".read": "auth != null",
+      "$uid": {
+        ".write": "auth != null && (auth.uid === $uid && (auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com' || root.child('users/' + auth.uid + '/role').val() === 'admin') || root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      },
+      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+    },
+    "supportTickets": {
+      ".read": "auth != null",
+      "$ticketId": {
+        ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+      }
+    }
+  }
+}
