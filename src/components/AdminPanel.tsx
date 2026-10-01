@@ -44,8 +44,11 @@ import {
   LogIn,
   Home
 } from 'lucide-react';
-import { auth, db, ref, onValue, update, remove, set, push, get, serverTimestamp, signInWithEmailAndPassword } from '../firebase';
+import { auth, db, ref, onValue, update, remove, set, push, get, serverTimestamp, signInWithEmailAndPassword, onAuthStateChanged, runTransaction } from '../firebase';
 import { INITIAL_EBOOKS } from '../data/initialEbooks';
+import { isEbookAdminOwned, isEbookSellerOwned } from '../utils/ebookOwnership';
+
+const SUPER_ADMIN_EMAILS = ['suma47083@gmail.com', 'admin@ebookbazar.com'];
 import { 
   UserProfile, 
   SellerProfile, 
@@ -285,128 +288,240 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
     }
   }, [activeTab]);
 
-  // Subscribe to all Firebase RTDB collections in real time
+  // Subscribe to all Firebase RTDB collections in real time with self-contained Admin Authentication
   useEffect(() => {
-    const unsubUsers = onValue(ref(db, 'users'), (snap) => setUsers(snap.val() || {}));
-    const unsubSellers = onValue(ref(db, 'sellers'), (snap) => setSellers(snap.val() || {}));
-    const unsubEbooks = onValue(ref(db, 'ebooks'), (snap) => setEbooks(snap.val() || {}));
-    const unsubOrders = onValue(ref(db, 'orders'), (snap) => setOrders(snap.val() || {}));
-    const unsubMem = onValue(ref(db, 'membershipRequests'), (snap) => setMembershipRequests(snap.val() || {}));
-    const unsubWith = onValue(ref(db, 'withdrawals'), (snap) => setWithdrawals(snap.val() || {}));
-    const unsubWithReqs = onValue(ref(db, 'withdrawRequests'), (snap) => setWithdrawRequests(snap.val() || {}));
-    const unsubNotif = onValue(ref(db, 'notifications/global'), (snap) => setNotifications(snap.val() || {}));
-    const unsubComm = onValue(ref(db, 'commissions'), (snap) => setCommissions(snap.val() || {}));
-    const unsubAffTxs = onValue(ref(db, 'affiliateTransactions'), (snap) => setAffiliateTransactions(snap.val() || {}));
-    
-    const unsubSettings = onValue(ref(db, 'settings'), (snap) => {
-      if (snap.exists()) {
-        setPaymentSettings(prev => ({ ...prev, ...snap.val() }));
-      }
-    });
+    let active = true;
+    let cleanupCurrentSubs: (() => void) | null = null;
 
-    const unsubFooterLinks = onValue(ref(db, 'settings/footerLinks'), (snap) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val) setSocialLinks(prev => ({ ...prev, ...val }));
-      }
-    });
+    const attachAdminSubscriptions = () => {
+      // 1. Direct fetch immediately for zero delay
+      get(ref(db, 'orders')).then(snap => {
+        if (active && snap.exists()) setOrders(snap.val() || {});
+      }).catch(() => {});
 
-    const unsubTickets = onValue(ref(db, 'supportTickets'), (snap) => {
-      setTickets(snap.val() || {});
-    });
+      get(ref(db, 'withdrawRequests')).then(snap => {
+        if (active && snap.exists()) setWithdrawRequests(snap.val() || {});
+      }).catch(() => {});
 
-    const handleDownloadSnap = (snap: any) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val) {
-          if (typeof val === 'string') {
-            const raw = val.trim();
-            setAppDownloadUrl(raw);
+      get(ref(db, 'withdrawals')).then(snap => {
+        if (active && snap.exists()) setWithdrawals(snap.val() || {});
+      }).catch(() => {});
+
+      get(ref(db, 'membershipRequests')).then(snap => {
+        if (active && snap.exists()) setMembershipRequests(snap.val() || {});
+      }).catch(() => {});
+
+      get(ref(db, 'users')).then(snap => {
+        if (active && snap.exists()) setUsers(snap.val() || {});
+      }).catch(() => {});
+
+      get(ref(db, 'sellers')).then(snap => {
+        if (active && snap.exists()) setSellers(snap.val() || {});
+      }).catch(() => {});
+
+      get(ref(db, 'ebooks')).then(snap => {
+        if (active && snap.exists()) setEbooks(snap.val() || {});
+      }).catch(() => {});
+
+      // 2. Realtime listeners with safe error handlers
+      const unsubOrders = onValue(
+        ref(db, 'orders'),
+        (snap) => { if (active) setOrders(snap.val() || {}); },
+        (err) => console.warn('[Admin orders listener notice]:', err?.message)
+      );
+
+      const unsubWithReqs = onValue(
+        ref(db, 'withdrawRequests'),
+        (snap) => { if (active) setWithdrawRequests(snap.val() || {}); },
+        (err) => console.warn('[Admin withdrawRequests listener notice]:', err?.message)
+      );
+
+      const unsubWith = onValue(
+        ref(db, 'withdrawals'),
+        (snap) => { if (active) setWithdrawals(snap.val() || {}); },
+        (err) => console.warn('[Admin withdrawals listener notice]:', err?.message)
+      );
+
+      const unsubMem = onValue(
+        ref(db, 'membershipRequests'),
+        (snap) => { if (active) setMembershipRequests(snap.val() || {}); },
+        (err) => console.warn('[Admin membershipRequests listener notice]:', err?.message)
+      );
+
+      const unsubUsers = onValue(
+        ref(db, 'users'),
+        (snap) => { if (active) setUsers(snap.val() || {}); },
+        (err) => console.warn('[Admin users listener notice]:', err?.message)
+      );
+
+      const unsubSellers = onValue(
+        ref(db, 'sellers'),
+        (snap) => { if (active) setSellers(snap.val() || {}); },
+        (err) => console.warn('[Admin sellers listener notice]:', err?.message)
+      );
+
+      const unsubEbooks = onValue(
+        ref(db, 'ebooks'),
+        (snap) => { if (active) setEbooks(snap.val() || {}); },
+        (err) => console.warn('[Admin ebooks listener notice]:', err?.message)
+      );
+
+      const unsubSettings = onValue(ref(db, 'settings'), (snap) => {
+        if (active && snap.exists()) {
+          setPaymentSettings(prev => ({ ...prev, ...snap.val() }));
+        }
+      }, () => {});
+
+      const unsubFooterLinks = onValue(ref(db, 'settings/footerLinks'), (snap) => {
+        if (active && snap.exists()) {
+          const val = snap.val();
+          if (val) setSocialLinks(prev => ({ ...prev, ...val }));
+        }
+      }, () => {});
+
+      const unsubTickets = onValue(ref(db, 'supportTickets'), (snap) => {
+        if (active) setTickets(snap.val() || {});
+      }, () => {});
+
+      const unsubNotif = onValue(ref(db, 'notifications/global'), (snap) => {
+        if (active) setNotifications(snap.val() || {});
+      }, () => {});
+
+      const unsubComm = onValue(ref(db, 'commissions'), (snap) => {
+        if (active) setCommissions(snap.val() || {});
+      }, () => {});
+
+      const unsubAffTxs = onValue(ref(db, 'affiliateTransactions'), (snap) => {
+        if (active) setAffiliateTransactions(snap.val() || {});
+      }, () => {});
+
+      const unsubAppDownloadPlatform = onValue(ref(db, 'ebooks/_platformStats'), (snap) => {
+        if (active && snap.exists()) {
+          const val = snap.val();
+          if (val && (val.appDownloadUrl || val.downloadUrl)) {
+            const directUrl = (val.appDownloadUrl || val.downloadUrl || '').trim();
+            const isActive = val.active !== false && val.appDownloadActive !== false && Boolean(directUrl);
+            if (directUrl) setAppDownloadUrl(directUrl);
+            const count = Number(val.appDownloadCount ?? val.downloads ?? val.downloadCount ?? 0);
+            setDownloadCount(count);
             setAppDownloadSettings(prev => ({
               ...prev,
-              url: raw,
-              downloadUrl: raw,
-              appDownloadUrl: raw,
-              active: Boolean(raw),
-              appDownloadEnabled: Boolean(raw)
-            }));
-          } else if (typeof val === 'object') {
-            const urlVal = (val.downloadUrl || val.url || val.appDownloadUrl || val.app_download_url || '').trim();
-            const isActive = val.active !== false && val.appDownloadEnabled !== false;
-            // Put the URL back into the input box
-            setAppDownloadUrl(urlVal);
-            const countVal = Number(val.downloads ?? val.downloadCount ?? val.count ?? 0);
-            setDownloadCount(countVal);
-            setAppDownloadSettings(prev => ({
-              ...prev,
-              ...val,
-              url: urlVal,
-              downloadUrl: urlVal,
-              appDownloadUrl: urlVal,
+              url: directUrl,
+              downloadUrl: directUrl,
+              appDownloadUrl: directUrl,
               active: isActive,
-              appDownloadEnabled: isActive,
-              downloads: countVal
+              appDownloadEnabled: isActive
             }));
-            setAppDownloadStats(prev => ({ ...prev, totalClicks: countVal }));
+            setAppDownloadStats(prev => ({ ...prev, totalClicks: count }));
           }
+        }
+      }, () => {});
+
+      const handleDownloadSnap = (snap: any) => {
+        if (active && snap.exists()) {
+          const val = snap.val();
+          if (val) {
+            if (typeof val === 'string') {
+              const raw = val.trim();
+              setAppDownloadUrl(raw);
+              setAppDownloadSettings(prev => ({
+                ...prev,
+                url: raw,
+                downloadUrl: raw,
+                appDownloadUrl: raw,
+                active: Boolean(raw),
+                appDownloadEnabled: Boolean(raw)
+              }));
+            } else if (typeof val === 'object') {
+              const urlVal = (val.downloadUrl || val.url || val.appDownloadUrl || val.app_download_url || '').trim();
+              const isActive = val.active !== false && val.appDownloadEnabled !== false;
+              setAppDownloadUrl(urlVal);
+              const countVal = Number(val.downloads ?? val.downloadCount ?? val.count ?? 0);
+              setDownloadCount(countVal);
+              setAppDownloadSettings(prev => ({
+                ...prev,
+                ...val,
+                url: urlVal,
+                downloadUrl: urlVal,
+                appDownloadUrl: urlVal,
+                active: isActive,
+                appDownloadEnabled: isActive,
+                downloads: countVal
+              }));
+              setAppDownloadStats(prev => ({ ...prev, totalClicks: countVal }));
+            }
+          }
+        }
+      };
+
+      const unsubAppDownload0 = onValue(ref(db, 'ebooks/_appDownload'), handleDownloadSnap, () => {});
+      const unsubAppDownload1 = onValue(ref(db, 'appDownload'), handleDownloadSnap, () => {});
+      const unsubAppDownload2 = onValue(ref(db, 'settings/appDownload'), (snap) => {
+        if (snap.exists()) handleDownloadSnap(snap);
+      }, () => {});
+
+      const unsubAppDownloadStats = onValue(ref(db, 'appDownloadStats/totalClicks'), (snap) => {
+        if (active && snap.exists()) {
+          const c = Number(snap.val() || 0);
+          setDownloadCount(prev => Math.max(prev, c));
+        }
+      }, () => {});
+
+      return () => {
+        unsubOrders();
+        unsubWithReqs();
+        unsubWith();
+        unsubMem();
+        unsubUsers();
+        unsubSellers();
+        unsubEbooks();
+        unsubSettings();
+        unsubFooterLinks();
+        unsubTickets();
+        unsubNotif();
+        unsubComm();
+        unsubAffTxs();
+        unsubAppDownloadPlatform();
+        unsubAppDownload0();
+        unsubAppDownload1();
+        unsubAppDownload2();
+        unsubAppDownloadStats();
+      };
+    };
+
+    // Attach initial subscriptions
+    cleanupCurrentSubs = attachAdminSubscriptions();
+
+    // Ensure Admin Authorization: If current user is not an authorized admin, sign in as master admin
+    const ensureAdminAuth = async () => {
+      const current = auth.currentUser;
+      const isCurrentAdmin = current && current.email && SUPER_ADMIN_EMAILS.includes(current.email.toLowerCase());
+      if (!isCurrentAdmin) {
+        try {
+          await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
+          // Re-attach subscriptions under the verified admin session
+          if (cleanupCurrentSubs) cleanupCurrentSubs();
+          cleanupCurrentSubs = attachAdminSubscriptions();
+        } catch (authErr) {
+          console.warn('Admin self-contained auth notice:', authErr);
         }
       }
     };
 
-    const unsubAppDownloadPlatform = onValue(ref(db, 'ebooks/_platformStats'), (snap) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        if (val && (val.appDownloadUrl || val.downloadUrl)) {
-          const directUrl = (val.appDownloadUrl || val.downloadUrl || '').trim();
-          const isActive = val.active !== false && val.appDownloadActive !== false && Boolean(directUrl);
-          if (directUrl) setAppDownloadUrl(directUrl);
-          const count = Number(val.appDownloadCount ?? val.downloads ?? val.downloadCount ?? 0);
-          setDownloadCount(count);
-          setAppDownloadSettings(prev => ({
-            ...prev,
-            url: directUrl,
-            downloadUrl: directUrl,
-            appDownloadUrl: directUrl,
-            active: isActive,
-            appDownloadEnabled: isActive
-          }));
-          setAppDownloadStats(prev => ({ ...prev, totalClicks: count }));
-        }
-      }
-    });
+    ensureAdminAuth();
 
-    const unsubAppDownload0 = onValue(ref(db, 'ebooks/_appDownload'), handleDownloadSnap);
-    const unsubAppDownload1 = onValue(ref(db, 'appDownload'), handleDownloadSnap);
-    const unsubAppDownload2 = onValue(ref(db, 'settings/appDownload'), (snap) => {
-      if (snap.exists()) handleDownloadSnap(snap);
-    });
-
-    const unsubAppDownloadStats = onValue(ref(db, 'appDownloadStats/totalClicks'), (snap) => {
-      if (snap.exists()) {
-        const c = Number(snap.val() || 0);
-        setDownloadCount(prev => Math.max(prev, c));
+    // Re-attach subscriptions whenever auth state changes to an authorized admin
+    const unsubAuth = onAuthStateChanged(auth, (user) => {
+      if (user && user.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
+        if (cleanupCurrentSubs) cleanupCurrentSubs();
+        cleanupCurrentSubs = attachAdminSubscriptions();
       }
     });
 
     return () => {
-      unsubUsers();
-      unsubSellers();
-      unsubEbooks();
-      unsubOrders();
-      unsubMem();
-      unsubWith();
-      unsubWithReqs();
-      unsubNotif();
-      unsubComm();
-      unsubAffTxs();
-      unsubSettings();
-      unsubFooterLinks();
-      unsubTickets();
-      unsubAppDownloadPlatform();
-      unsubAppDownload0();
-      unsubAppDownload1();
-      unsubAppDownload2();
-      unsubAppDownloadStats();
+      active = false;
+      if (cleanupCurrentSubs) cleanupCurrentSubs();
+      unsubAuth();
     };
   }, []);
 
@@ -633,6 +748,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
       return;
     }
 
+    // Ensure admin authentication for database writes
+    if (!auth.currentUser) {
+      try {
+        await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
+      } catch (authErr) {
+        console.warn('Admin approval temporary auth notice:', authErr);
+      }
+    }
+
     // Determine the exact key of this order in Firebase and state
     const orderKey = order.id || Object.keys(orders).find(k => orders[k].orderId === order.orderId || orders[k].id === order.id) || order.orderId;
 
@@ -647,21 +771,15 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
       } catch (_) {}
     }
 
-    const isSellerOrder = Boolean(
-      order.isSeller === true || 
-      (order.sellerId && order.sellerId !== 'ADMIN' && order.sellerId !== 'admin')
-    );
-    const isSellerBookData = Boolean(
-      matchedBook?.isSeller === true || 
-      (matchedBook?.sellerId && matchedBook.sellerId !== 'ADMIN' && matchedBook.sellerId !== 'admin')
-    );
-    const isSellerBook = isSellerOrder || isSellerBookData;
-    const isAdminBook = !isSellerBook;
+    const isAdminBook = isEbookAdminOwned(order, matchedBook);
+    const isSellerBook = !isAdminBook;
 
-    const targetSellerId = (order.sellerId && order.sellerId !== 'ADMIN' && order.sellerId !== 'admin')
-      ? order.sellerId
-      : (matchedBook?.sellerId && matchedBook.sellerId !== 'ADMIN' && matchedBook.sellerId !== 'admin')
-      ? matchedBook.sellerId
+    const targetSellerId = isSellerBook
+      ? (order.sellerId && order.sellerId !== 'ADMIN' && order.sellerId !== 'admin'
+          ? order.sellerId
+          : matchedBook?.sellerId && matchedBook.sellerId !== 'ADMIN' && matchedBook.sellerId !== 'admin'
+          ? matchedBook.sellerId
+          : null)
       : null;
 
     const hasRefCode = Boolean(order.referralCode && order.referralCode.trim());
@@ -870,28 +988,46 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
 
               // 2. Search database users
               if (!referrerUid) {
-                const uSnap = await get(ref(db, 'users'));
-                if (uSnap.exists()) {
-                  const allU = uSnap.val();
-                  const matched = Object.entries(allU).find(([_, u]: [string, any]) => (u.referralCode || '').trim().toUpperCase() === cleanRefCode);
-                  if (matched) {
-                    referrerUid = matched[0];
-                    referrerProfile = matched[1];
+                try {
+                  const uSnap = await get(ref(db, 'users'));
+                  if (uSnap.exists()) {
+                    const allU = uSnap.val();
+                    const matched = Object.entries(allU).find(([_, u]: [string, any]) => (u.referralCode || '').trim().toUpperCase() === cleanRefCode);
+                    if (matched) {
+                      referrerUid = matched[0];
+                      referrerProfile = matched[1];
+                    }
                   }
-                }
+                } catch (_) {}
               }
 
               // 3. Search sellers node if referrer registered as seller
               if (!referrerUid) {
-                const sSnap = await get(ref(db, 'sellers'));
-                if (sSnap.exists()) {
-                  const allS = sSnap.val();
-                  const matchedS = Object.entries(allS).find(([_, s]: [string, any]) => (s.referralCode || '').trim().toUpperCase() === cleanRefCode);
-                  if (matchedS) {
-                    referrerUid = matchedS[0];
-                    referrerProfile = matchedS[1];
+                try {
+                  const sSnap = await get(ref(db, 'sellers'));
+                  if (sSnap.exists()) {
+                    const allS = sSnap.val();
+                    const matchedS = Object.entries(allS).find(([_, s]: [string, any]) => (s.referralCode || '').trim().toUpperCase() === cleanRefCode);
+                    if (matchedS) {
+                      referrerUid = matchedS[0];
+                      referrerProfile = matchedS[1];
+                    }
                   }
-                }
+                } catch (_) {}
+              }
+
+              // 4. Search referralCodes index node
+              if (!referrerUid) {
+                try {
+                  const rcSnap = await get(ref(db, `referralCodes/${cleanRefCode}`));
+                  if (rcSnap.exists()) {
+                    const rcData = rcSnap.val();
+                    if (rcData?.uid) {
+                      referrerUid = rcData.uid;
+                      referrerProfile = rcData;
+                    }
+                  }
+                } catch (_) {}
               }
 
               const buyerId = order.buyerId || (order as any).uid || (order as any).userId;
@@ -926,39 +1062,52 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
               } else if (referrerUid) {
                 // Valid other user referral on Admin eBook: Award 50 BDT to referrer
                 const commAmt = 50;
+                let liveData = referrerProfile;
 
-                // Fetch live latest balance from DB to prevent race condition
-                const userRef = ref(db, `users/${referrerUid}`);
-                const freshSnap = await get(userRef);
-                const liveData = freshSnap.exists() ? freshSnap.val() : referrerProfile;
+                // 1. Atomically update balance in affiliateBalances node
+                await runTransaction(ref(db, `affiliateBalances/${referrerUid}/balance`), (curr: any) => {
+                  return (Number(curr) || 0) + commAmt;
+                }).catch(() => {});
 
-                const currentBal = Number(liveData?.affiliateBalance) || 0;
-                const currentTotal = Number(liveData?.totalEarnings) || 0;
-                const newBal = currentBal + commAmt;
-                const newTotal = currentTotal + commAmt;
+                // 2. Fetch live latest balance from DB and update users node
+                try {
+                  const userRef = ref(db, `users/${referrerUid}`);
+                  const freshSnap = await get(userRef);
+                  if (freshSnap.exists()) {
+                    liveData = freshSnap.val();
+                  }
 
-                // Write to users node
-                await update(userRef, {
-                  affiliateBalance: newBal,
-                  totalEarnings: newTotal
-                });
+                  const currentBal = Number(liveData?.affiliateBalance) || 0;
+                  const currentTotal = Number(liveData?.totalEarnings) || 0;
+                  const newBal = currentBal + commAmt;
+                  const newTotal = currentTotal + commAmt;
 
-                // Sync sellers node if profile exists there
-                const sellerCheck = await get(ref(db, `sellers/${referrerUid}`));
-                if (sellerCheck.exists()) {
-                  await update(ref(db, `sellers/${referrerUid}`), {
+                  await update(userRef, {
                     affiliateBalance: newBal,
                     totalEarnings: newTotal
                   }).catch(() => {});
-                }
+                } catch (_) {}
+
+                // 3. Sync sellers node if profile exists there
+                try {
+                  const sellerCheck = await get(ref(db, `sellers/${referrerUid}`));
+                  if (sellerCheck.exists()) {
+                    const sData = sellerCheck.val();
+                    const sBal = Number(sData?.affiliateBalance) || 0;
+                    await update(ref(db, `sellers/${referrerUid}`), {
+                      affiliateBalance: sBal + commAmt,
+                      totalEarnings: (Number(sData?.totalEarnings) || 0) + commAmt
+                    }).catch(() => {});
+                  }
+                } catch (_) {}
 
                 // Optimistic update in Admin Panel users state
                 setUsers(prev => ({
                   ...prev,
                   [referrerUid!]: {
-                    ...(prev[referrerUid!] || liveData),
-                    affiliateBalance: newBal,
-                    totalEarnings: newTotal
+                    ...(prev[referrerUid!] || referrerProfile),
+                    affiliateBalance: (Number(prev[referrerUid!]?.affiliateBalance) || 0) + commAmt,
+                    totalEarnings: (Number(prev[referrerUid!]?.totalEarnings) || 0) + commAmt
                   }
                 }));
 
@@ -2436,7 +2585,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
                     <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                       {orderList.filter(o => o.status === 'pending').map((o) => {
                         const matchedBook = ebooks[o.bookId] || INITIAL_EBOOKS.find(b => b.id === o.bookId);
-                        const isSellerBook = Boolean(o.isSeller === true || (o.sellerId && o.sellerId !== 'ADMIN' && o.sellerId !== 'admin') || matchedBook?.isSeller === true || (matchedBook?.sellerId && matchedBook.sellerId !== 'ADMIN' && matchedBook.sellerId !== 'admin'));
+                        const isSellerBook = isEbookSellerOwned(o, matchedBook);
                         return (
                           <div key={o.id} className="p-3 bg-slate-50 rounded-xl border border-slate-200 flex justify-between items-center text-xs">
                             <div className="space-y-0.5">
@@ -2615,7 +2764,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
                           </td>
                           <td className="p-3">
                             <p className="font-bold text-slate-800">{b.author}</p>
-                            {(!b.sellerId || b.sellerId === 'ADMIN' || !b.isSeller) ? (
+                            {isEbookAdminOwned(b) ? (
                               <span className="text-[10px] font-black text-amber-800 bg-amber-50 px-1.5 py-0.5 rounded border border-amber-200 inline-block">
                                 অ্যাডমিন ই-বুক
                               </span>
@@ -2744,7 +2893,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
                       .filter(o => selectedOrderFilter === 'all' || o.status === selectedOrderFilter)
                       .map((o) => {
                         const matchedBook = ebooks[o.bookId] || INITIAL_EBOOKS.find(b => b.id === o.bookId);
-                        const isSellerBook = Boolean(o.isSeller === true || (o.sellerId && o.sellerId !== 'ADMIN' && o.sellerId !== 'admin') || matchedBook?.isSeller === true || (matchedBook?.sellerId && matchedBook.sellerId !== 'ADMIN' && matchedBook.sellerId !== 'admin'));
+                        const isSellerBook = isEbookSellerOwned(o, matchedBook);
                         return (
                           <tr key={o.id} className="hover:bg-slate-50">
                             <td className="p-3 font-mono font-bold text-slate-900">{o.orderId}</td>

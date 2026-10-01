@@ -2,6 +2,7 @@ import React from 'react';
 import { ShoppingCart, Eye, Zap, BookOpen, Crown, ShoppingBag } from 'lucide-react';
 import { Ebook } from '../types';
 import { useCart } from '../context/CartContext';
+import { isEbookAdminOwned } from '../utils/ebookOwnership';
 
 interface EbookCardProps {
   ebook: Ebook;
@@ -15,7 +16,7 @@ export const EbookCard: React.FC<EbookCardProps> = ({ ebook, onViewDetails, onBu
   const salePrice = ebook.discountPrice ? Math.min(ebook.discountPrice, ebook.price) : (ebook.regularPrice && ebook.regularPrice > ebook.price ? ebook.price : ebook.price);
   const oldPrice = Math.max(regularPrice, ebook.price);
   const isDiscounted = oldPrice > salePrice;
-  const isAdminBook = !ebook.sellerId || ebook.sellerId === 'ADMIN' || !ebook.isSeller;
+  const isAdminBook = isEbookAdminOwned(ebook);
 
   const handleAddToCart = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -30,7 +31,7 @@ export const EbookCard: React.FC<EbookCardProps> = ({ ebook, onViewDetails, onBu
       sellerName: ebook.sellerName,
       sellerEmail: ebook.sellerEmail,
       sellerReferralCode: ebook.sellerReferralCode,
-      isSeller: ebook.isSeller ?? false
+      isSeller: !isAdminBook
     });
   };
 

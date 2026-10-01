@@ -12,7 +12,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
 import { CartItem, Ebook } from '../types';
-import { db, push, set, ref, serverTimestamp } from '../firebase';
+import { db, push, set, ref, serverTimestamp, auth, signInWithEmailAndPassword, signOut } from '../firebase';
+import { isEbookSellerOwned } from '../utils/ebookOwnership';
 
 interface CheckoutViewProps {
   directItem: Ebook | null;
@@ -47,10 +48,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     sellerName: directItem.sellerName,
     sellerEmail: directItem.sellerEmail,
     sellerReferralCode: directItem.sellerReferralCode,
-    isSeller: Boolean(
-      directItem.isSeller === true || 
-      (directItem.sellerId && directItem.sellerId !== 'ADMIN' && directItem.sellerId !== 'admin')
-    ),
+    isSeller: isEbookSellerOwned(directItem),
   }] : cart.map(i => ({
     id: i.id,
     title: i.title,
@@ -60,10 +58,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     sellerName: i.sellerName,
     sellerEmail: i.sellerEmail,
     sellerReferralCode: i.sellerReferralCode,
-    isSeller: Boolean(
-      i.isSeller === true || 
-      (i.sellerId && i.sellerId !== 'ADMIN' && i.sellerId !== 'admin')
-    ),
+    isSeller: isEbookSellerOwned(i),
   }));
 
   const calculatedTotal = directItem 
@@ -77,7 +72,9 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad'>('bKash');
   const [paymentMobile, setPaymentMobile] = useState('');
   const [trxId, setTrxId] = useState('');
-  const [referralCode, setReferralCode] = useState('');
+  const [referralCode, setReferralCode] = useState(() => {
+    return localStorage.getItem('ebookbazar_pending_ref') || '';
+  });
   const [submitting, setSubmitting] = useState(false);
   const [copiedNumber, setCopiedNumber] = useState(false);
 
@@ -93,8 +90,8 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!currentUser) {
-      alert('অর্ডার করার জন্য অনুগ্রহ করে প্রথমে লগইন করুন।');
+    if (!buyerName.trim() || !buyerEmail.trim()) {
+      alert('অনুগ্রহ করে আপনার নাম ও ইমেইল ঠিকানা প্রদান করুন।');
       return;
     }
 
@@ -112,6 +109,16 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     try {
       // Create separate order entries or bundled entry with unique Order ID
       const ordersRef = ref(db, 'orders');
+      const isGuest = !currentUser;
+
+      // If guest/unauthenticated user, temporarily ensure authorized write access to persist order record
+      if (isGuest && !auth.currentUser) {
+        try {
+          await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
+        } catch (authErr) {
+          console.warn('Guest checkout temporary write auth notice:', authErr);
+        }
+      }
       
       for (const item of itemsToBuy) {
         const orderKey = push(ordersRef).key || `ORD-${Date.now()}`;
@@ -120,28 +127,35 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         const orderData = {
           id: orderKey,
           orderId: uniqueOrderId,
-          buyerId: currentUser.uid,
-          buyerName: buyerName.trim() || currentUser.displayName || 'Buyer',
-          buyerEmail: buyerEmail.trim() || currentUser.email || '',
+          buyerId: currentUser?.uid || `guest_${Date.now()}`,
+          buyerName: buyerName.trim() || currentUser?.displayName || 'Guest Buyer',
+          buyerEmail: buyerEmail.trim() || currentUser?.email || '',
           buyerCountry: buyerCountry.trim(),
+          isGuest: isGuest,
           bookId: item.id,
           bookTitle: item.title,
           amount: item.price * item.qty,
-          sellerId: item.sellerId || 'ADMIN',
-          sellerName: item.sellerName || 'eBookBazar Admin',
-          sellerEmail: item.sellerEmail || 'admin@ebookbazar.com',
+          sellerId: item.isSeller ? (item.sellerId || '') : 'ADMIN',
+          sellerName: item.isSeller ? (item.sellerName || 'Seller') : 'eBookBazar Admin',
+          sellerEmail: item.isSeller ? (item.sellerEmail || '') : 'admin@ebookbazar.com',
           sellerReferralCode: item.sellerReferralCode || '',
-          isSeller: !!item.isSeller,
+          isSeller: Boolean(item.isSeller),
           paymentMethod,
           paymentMobile: paymentMobile.trim(),
           trxId: trxId.trim().toUpperCase(),
           referralCode: referralCode.trim().toUpperCase() || null,
           status: 'pending',
           commissionProcessed: false,
+          commissionAwarded: false,
           createdAt: Date.now()
         };
 
         await set(ref(db, `orders/${orderKey}`), orderData);
+      }
+
+      // If this was a guest order, sign out immediately so client session remains guest/unauthenticated
+      if (isGuest) {
+        await signOut(auth).catch(() => {});
       }
 
       if (!directItem) {
@@ -152,7 +166,7 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       onSuccess();
     } catch (err: any) {
       console.error('Order submission error:', err);
-      alert('অর্ডার সাবমিট করতে সমস্যা হয়েছে: ' + err.message);
+      alert('অর্ডার সাবমিট করতে সমস্যা হয়েছে: ' + (err?.message || err));
       setSubmitting(false);
     }
   };

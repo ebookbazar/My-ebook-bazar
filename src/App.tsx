@@ -437,11 +437,6 @@ function MainApp() {
   });
 
   const handleBuyNow = (ebook: Ebook) => {
-    if (!currentUser) {
-      setAuthInitialMode('user-login');
-      setIsAuthOpen(true);
-      return;
-    }
     setDirectCheckoutItem(ebook);
     setSelectedEbook(null);
     setCurrentView('checkout');

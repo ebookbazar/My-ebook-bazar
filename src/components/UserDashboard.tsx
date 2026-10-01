@@ -327,6 +327,29 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
     };
   }, [currentUser, userProfile?.referralCode]);
 
+  // Auto-sync calculated affiliate earnings to database profile if transaction exists
+  useEffect(() => {
+    if (!currentUser) return;
+    const pendingWith = withdrawals
+      .filter(w => (w.status || '').toLowerCase() === 'pending')
+      .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+    const paidWith = withdrawals
+      .filter(w => (w.status || '').toLowerCase() === 'paid' || (w.status || '').toLowerCase() === 'approved')
+      .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+    const approvedComm = myAffiliateTransactions
+      .filter(t => t.status === 'APPROVED')
+      .reduce((sum, t) => sum + (Number(t.commissionAmount) || 50), 0);
+    const calculatedAvailable = Math.max(0, approvedComm - (pendingWith + paidWith));
+    const currentDbBal = Number(userProfile?.affiliateBalance) || 0;
+
+    if (calculatedAvailable > currentDbBal) {
+      update(ref(db, `users/${currentUser.uid}`), {
+        affiliateBalance: calculatedAvailable,
+        totalEarnings: Math.max(Number(userProfile?.totalEarnings) || 0, approvedComm)
+      }).catch(() => {});
+    }
+  }, [currentUser, myAffiliateTransactions, withdrawals, userProfile?.affiliateBalance, userProfile?.totalEarnings]);
+
   const handleCopyReferral = () => {
     if (!userProfile?.referralCode) return;
     navigator.clipboard.writeText(userProfile.referralCode).then(() => {
@@ -361,7 +384,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
       return;
     }
 
-    const currentBal = Number(userProfile.affiliateBalance) || 0;
+    const pendingWith = withdrawals
+      .filter(w => (w.status || '').toLowerCase() === 'pending')
+      .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+    const paidWith = withdrawals
+      .filter(w => (w.status || '').toLowerCase() === 'paid' || (w.status || '').toLowerCase() === 'approved')
+      .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+    const approvedComm = myAffiliateTransactions
+      .filter(t => t.status === 'APPROVED')
+      .reduce((sum, t) => sum + (Number(t.commissionAmount) || 50), 0);
+    const currentBal = Math.max(
+      Number(userProfile.affiliateBalance) || 0,
+      Math.max(0, approvedComm - (pendingWith + paidWith))
+    );
     if (withdrawAmount < MIN_WITHDRAW) {
       setWithdrawErrorMsg(`সর্বনিম্ন উত্তোলনের পরিমাণ ৳${MIN_WITHDRAW}।`);
       return;
@@ -857,7 +892,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
 
           {/* Balance Cards (Rule 6) */}
           {(() => {
-            const availableBal = Number(userProfile?.affiliateBalance) || 0;
             const pendingWith = withdrawals
               .filter(w => (w.status || '').toLowerCase() === 'pending')
               .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
@@ -868,6 +902,10 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
               .filter(t => t.status === 'APPROVED')
               .reduce((sum, t) => sum + (Number(t.commissionAmount) || 50), 0);
             const totalComm = Math.max(approvedComm, Number(userProfile?.totalEarnings) || 0);
+            const availableBal = Math.max(
+              Number(userProfile?.affiliateBalance) || 0,
+              Math.max(0, approvedComm - (pendingWith + paidWith))
+            );
 
             return (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">

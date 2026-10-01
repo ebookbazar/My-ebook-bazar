@@ -2,6 +2,7 @@ import React from 'react';
 import { Sparkles, Eye, ShoppingCart, Crown, ShoppingBag, ArrowRight } from 'lucide-react';
 import { Ebook } from '../types';
 import { useCart } from '../context/CartContext';
+import { isEbookAdminOwned } from '../utils/ebookOwnership';
 
 interface CuratedPicksSectionProps {
   ebooks: Ebook[];
@@ -49,7 +50,7 @@ export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = ({
           const salePrice = book.discountPrice ? Math.min(book.discountPrice, book.price) : (book.regularPrice && book.regularPrice > book.price ? book.price : book.price);
           const oldPrice = Math.max(regularPrice, book.price);
           const isDiscounted = oldPrice > salePrice;
-          const isAdminBook = !book.sellerId || book.sellerId === 'ADMIN' || !book.isSeller;
+          const isAdminBook = isEbookAdminOwned(book);
 
           return (
             <div

@@ -152,6 +152,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
+      if (prof.referralCode) {
+        const c = prof.referralCode.trim().toUpperCase();
+        set(ref(db, `referralCodes/${c}`), {
+          uid,
+          referralCode: c,
+          fullName: prof.fullName || user.displayName || 'User',
+          email: user.email || ''
+        }).catch(() => {});
+      }
+
       if (userIsAdmin) {
         prof.role = 'admin';
       }

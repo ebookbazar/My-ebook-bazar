@@ -2,6 +2,7 @@ import React from 'react';
 import { X, ShoppingCart, Zap, BookOpen, Star, User, Tag, ShieldCheck, Crown, ShoppingBag } from 'lucide-react';
 import { Ebook } from '../types';
 import { useCart } from '../context/CartContext';
+import { isEbookAdminOwned } from '../utils/ebookOwnership';
 
 interface EbookDetailModalProps {
   ebook: Ebook | null;
@@ -19,6 +20,7 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
   const { addToCart } = useCart();
   if (!ebook) return null;
 
+  const isAdminBook = isEbookAdminOwned(ebook);
   const regularPrice = ebook.regularPrice || (ebook.discountPrice && ebook.discountPrice < ebook.price ? ebook.price : ebook.price);
   const salePrice = ebook.discountPrice ? Math.min(ebook.discountPrice, ebook.price) : (ebook.regularPrice && ebook.regularPrice > ebook.price ? ebook.price : ebook.price);
   const oldPrice = Math.max(regularPrice, ebook.price);
@@ -36,7 +38,7 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
       sellerName: ebook.sellerName,
       sellerEmail: ebook.sellerEmail,
       sellerReferralCode: ebook.sellerReferralCode,
-      isSeller: ebook.isSeller ?? false
+      isSeller: !isAdminBook
     });
   };
 
@@ -84,7 +86,7 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
           <div className="space-y-4 flex flex-col justify-between">
             <div className="space-y-3">
               <div className="flex flex-wrap items-center gap-2">
-                {(!ebook.sellerId || ebook.sellerId === 'ADMIN' || !ebook.isSeller) ? (
+                {isAdminBook ? (
                   <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-xs sm:text-sm font-black px-3.5 py-1 rounded-xl shadow-md border-2 border-amber-300 flex items-center gap-1.5 uppercase tracking-wide">
                     <Crown className="w-4 h-4 fill-slate-950 text-slate-950" />
                     <span>অ্যাডমিন ই-বুক (৫০৳ রেফারেল বোনাস)</span>
@@ -146,11 +148,11 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
 
               {/* Referral Earning Rule Badge */}
               <div className={`p-3.5 rounded-2xl border text-xs sm:text-sm leading-relaxed ${
-                !ebook.isSeller 
+                isAdminBook 
                   ? 'bg-amber-50 border-amber-300 text-amber-950' 
                   : 'bg-indigo-50 border-indigo-200 text-indigo-950'
               }`}>
-                {!ebook.isSeller ? (
+                {isAdminBook ? (
                   <p>
                     ⭐ <b>৫০৳ রেফারেল কমিশন প্রযোজ্য:</b> এটি অ্যাডমিন ই-বুক। কোনো ক্রেতা আপনার রেফারেল কোড ব্যবহার করে এটি কিনলে এবং অ্যাডমিন অনুমোদন দিলে আপনার অ্যাকাউন্টে ৫০ টাকা জমা হবে।
                   </p>
