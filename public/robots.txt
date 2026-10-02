@@ -1,0 +1,6 @@
+User-agent: *
+Allow: /
+Allow: /blog
+Allow: /blog/*
+
+Sitemap: https://ebookbazar.com/sitemap.xml

@@ -103,11 +103,14 @@ export interface BlogPost {
   author: string;
   authorRole?: string;
   date: string;
-  publishedAt?: string;
+  publishedAt?: string | number;
+  updatedAt?: number;
+  createdAt?: number;
   readTime?: string;
   category: string;
   labels?: string[];
   coverImage: string;
+  imageAlt?: string;
   excerpt: string;
   content: string[];
   htmlContent?: string;
@@ -115,6 +118,14 @@ export interface BlogPost {
   isDemo?: boolean;
   type?: 'POST' | 'PAGE';
   status?: 'LIVE' | 'DRAFT' | 'SOFT_TRASHED';
+  seoTitle?: string;
+  metaDescription?: string;
+  focusKeyword?: string;
+  seoKeywords?: string;
+  canonicalUrl?: string;
+  allowIndex?: boolean;
+  internalLinks?: Array<{ text: string; url: string }>;
+  externalLinks?: Array<{ text: string; url: string; rel?: string; target?: string }>;
 }
 
 export interface MembershipPlan {

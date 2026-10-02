@@ -3952,6 +3952,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
       ".read": "true",
       ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
     },
+    "blogs": {
+      ".read": "true",
+      "$blogId": {
+        ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com' || auth.token.email === 'redx0187@gmail.com')"
+      }
+    },
     "settings": {
       ".read": "true",
       ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"

@@ -81,6 +81,7 @@ function MainApp() {
   const [isAuthOpen, setIsAuthOpen] = useState(false);
   const [authInitialMode, setAuthInitialMode] = useState<'user-login' | 'user-register' | 'seller-register' | 'admin-login'>('user-login');
   const [selectedBlogPost, setSelectedBlogPost] = useState<BlogPost | null>(null);
+  const [blogNotFoundSlug, setBlogNotFoundSlug] = useState<string | null>(null);
   const [isTermsOpen, setIsTermsOpen] = useState(false);
   const [isPrivacyOpen, setIsPrivacyOpen] = useState(false);
   const [copiedRef, setCopiedRef] = useState(false);
@@ -350,6 +351,94 @@ function MainApp() {
       return true;
     });
   }, [blogPosts, hideDemoBlogs]);
+
+  // Synchronize URL routing for /blog and /blog/:slug with HTML5 history and popstate
+  useEffect(() => {
+    const handleUrlRoute = () => {
+      if (typeof window === 'undefined') return;
+      const pathname = window.location.pathname;
+
+      if (pathname.startsWith('/blog/') || pathname === '/blog') {
+        setCurrentView('blog');
+        if (pathname.startsWith('/blog/')) {
+          const rawSlug = pathname.replace('/blog/', '').replace(/\/$/, '').trim();
+          if (rawSlug) {
+            const target = blogPosts.find(p => (p.slug && p.slug === rawSlug) || p.id === rawSlug);
+            const isUserAdmin = currentUser?.email === 'suma47083@gmail.com' || userProfile?.role === 'admin' || currentUser?.email === 'admin@ebookbazar.com' || currentUser?.email === 'redx0187@gmail.com';
+            if (target) {
+              if (target.status === 'DRAFT' && !isUserAdmin) {
+                setBlogNotFoundSlug(rawSlug);
+                setSelectedBlogPost(null);
+              } else {
+                setSelectedBlogPost(target);
+                setBlogNotFoundSlug(null);
+              }
+            } else if (blogPosts.length > 0) {
+              setBlogNotFoundSlug(rawSlug);
+              setSelectedBlogPost(null);
+            }
+          } else {
+            setSelectedBlogPost(null);
+            setBlogNotFoundSlug(null);
+          }
+        } else {
+          setSelectedBlogPost(null);
+          setBlogNotFoundSlug(null);
+        }
+      } else if (pathname === '/' || pathname === '/home') {
+        // Only reset if currently on blog view
+        setSelectedBlogPost(null);
+        setBlogNotFoundSlug(null);
+        setCurrentView(prev => (prev === 'blog' ? 'home' : prev));
+      }
+    };
+
+    handleUrlRoute();
+    window.addEventListener('popstate', handleUrlRoute);
+    return () => window.removeEventListener('popstate', handleUrlRoute);
+  }, [blogPosts, currentUser, userProfile]);
+
+  const handleOpenBlog = (post: BlogPost) => {
+    setSelectedBlogPost(post);
+    setBlogNotFoundSlug(null);
+    setCurrentView('blog');
+    const slug = post.slug || post.id;
+    if (typeof window !== 'undefined') {
+      const targetUrl = `/blog/${slug}`;
+      if (window.location.pathname !== targetUrl) {
+        window.history.pushState({ blogSlug: slug }, '', targetUrl);
+      }
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSetSelectedBlogPost = (post: BlogPost | null) => {
+    setSelectedBlogPost(post);
+    setBlogNotFoundSlug(null);
+    if (typeof window !== 'undefined') {
+      if (post) {
+        const slug = post.slug || post.id;
+        const targetUrl = `/blog/${slug}`;
+        if (window.location.pathname !== targetUrl) {
+          window.history.pushState({ blogSlug: slug }, '', targetUrl);
+        }
+      } else {
+        if (window.location.pathname.startsWith('/blog/')) {
+          window.history.pushState({}, '', '/blog');
+        }
+      }
+    }
+  };
+
+  const handleNavigateHomeFromBlog = () => {
+    setSelectedBlogPost(null);
+    setBlogNotFoundSlug(null);
+    setCurrentView('home');
+    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/blog')) {
+      window.history.pushState({}, '', '/');
+    }
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
 
   // Listen to URL hash for direct links (e.g. #admin, #seller, #dashboard, #features)
   useEffect(() => {
@@ -707,6 +796,11 @@ function MainApp() {
                 <button
                   onClick={() => {
                     setCurrentView('blog');
+                    setSelectedBlogPost(null);
+                    setBlogNotFoundSlug(null);
+                    if (typeof window !== 'undefined' && window.location.pathname !== '/blog') {
+                      window.history.pushState({}, '', '/blog');
+                    }
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
                   className="text-emerald-800 hover:text-emerald-950 font-black text-sm md:text-base flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-5 py-2.5 rounded-2xl transition shadow-xs"
@@ -720,18 +814,14 @@ function MainApp() {
                 {displayedBlogPosts.slice(0, 3).map((post) => (
                   <div 
                     key={post.id}
-                    onClick={() => {
-                      setSelectedBlogPost(post);
-                      setCurrentView('blog');
-                      window.scrollTo({ top: 0, behavior: 'smooth' });
-                    }}
+                    onClick={() => handleOpenBlog(post)}
                     className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer group hover:-translate-y-1 subtle-card-hover"
                   >
                     <div>
                       <div className="aspect-[16/10] overflow-hidden bg-slate-100 relative">
                         <img 
                           src={post.coverImage} 
-                          alt={post.title}
+                          alt={post.imageAlt || post.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                           loading="lazy"
                         />
@@ -835,12 +925,21 @@ function MainApp() {
             posts={displayedBlogPosts}
             allEbooks={ebooks}
             activePost={selectedBlogPost}
-            setActivePost={setSelectedBlogPost}
-            onNavigateHome={() => {
+            setActivePost={handleSetSelectedBlogPost}
+            onNavigateHome={handleNavigateHomeFromBlog}
+            onSelectEbook={(b) => {
+              setSelectedEbook(b);
               setCurrentView('home');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }}
-            isAdmin={currentUser?.email === 'suma47083@gmail.com' || userProfile?.role === 'admin'}
+            isAdmin={currentUser?.email === 'suma47083@gmail.com' || userProfile?.role === 'admin' || currentUser?.email === 'admin@ebookbazar.com' || currentUser?.email === 'redx0187@gmail.com'}
+            notFoundSlug={blogNotFoundSlug}
+            onClearNotFound={() => {
+              setBlogNotFoundSlug(null);
+              if (typeof window !== 'undefined') {
+                window.history.pushState({}, '', '/blog');
+              }
+            }}
             onDeleteDemo={async () => {
               if (window.confirm('আপনি কি নিশ্চিত যে সকল ডেমো ব্লগ পোস্ট ডিলিট করতে চান? এরপর শুধু আপনার তৈরি বাস্তব পোস্ট প্রদর্শিত হবে।')) {
                 await setHideDemoBlogsSetting(true);
@@ -1239,9 +1338,7 @@ function MainApp() {
         blogPosts={displayedBlogPosts}
         onSelectEbook={(b) => setSelectedEbook(b)}
         onSelectBlogPost={(p) => {
-          setSelectedBlogPost(p);
-          setCurrentView('blog');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
+          handleOpenBlog(p);
         }}
       />
 
@@ -1305,6 +1402,7 @@ function MainApp() {
         isOpen={isAdminBlogManagerOpen}
         onClose={() => setIsAdminBlogManagerOpen(false)}
         posts={blogPosts}
+        allEbooks={ebooks}
         onRefresh={() => {
           const p = extractBloggerPostsFromDOM();
           if (p.length > 0) setBlogPosts(p);
@@ -1321,8 +1419,8 @@ function MainApp() {
         />
       )}
 
-      {/* MODAL 6: BLOG FULL ARTICLE READER */}
-      {selectedBlogPost && (
+      {/* MODAL 6: BLOG FULL ARTICLE READER (Quick modal fallback if viewed outside dedicated blog page) */}
+      {selectedBlogPost && currentView !== 'blog' && (
         <BlogModal
           post={selectedBlogPost}
           onClose={() => setSelectedBlogPost(null)}

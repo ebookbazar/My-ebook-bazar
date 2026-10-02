@@ -371,33 +371,66 @@ export async function fetchBloggerFeedPosts(bloggerBaseUrl?: string): Promise<Bl
 }
 
 /**
+ * Recursively cleans and removes any undefined fields from objects or arrays,
+ * preventing Firebase Realtime Database "set failed: value argument contains undefined" errors.
+ */
+export function sanitizeObjectForFirebase<T>(data: T): T {
+  if (data === null || data === undefined) {
+    return null as any;
+  }
+  if (Array.isArray(data)) {
+    return data
+      .filter(item => item !== undefined)
+      .map(item => sanitizeObjectForFirebase(item)) as any;
+  }
+  if (typeof data === 'object') {
+    const result: any = {};
+    for (const [key, value] of Object.entries(data as Record<string, any>)) {
+      if (value !== undefined) {
+        result[key] = sanitizeObjectForFirebase(value);
+      }
+    }
+    return result;
+  }
+  return data;
+}
+
+/**
  * Saves a real blog post to Firebase RTDB
  */
 export async function saveBlogPostToFirebase(post: Omit<BlogPost, 'id'> & { id?: string }): Promise<string> {
   const blogsRef = ref(db, 'blogs');
+  const status = post.status || 'LIVE';
+  const allowIndex = post.allowIndex !== undefined ? post.allowIndex : (status === 'LIVE');
+
   if (post.id && !post.id.startsWith('post-')) {
     // update existing
     const singleRef = ref(db, `blogs/${post.id}`);
-    await set(singleRef, { 
+    const payload = sanitizeObjectForFirebase({ 
       ...post, 
       updatedAt: Date.now(), 
       isDemo: false, 
       type: 'POST', 
-      status: 'LIVE' 
+      status,
+      allowIndex
     });
+    await set(singleRef, payload);
     return post.id;
   } else {
     // create new
     const newRef = push(blogsRef);
     const newId = newRef.key as string;
-    await set(newRef, {
+    const payload = sanitizeObjectForFirebase({
       ...post,
       id: newId,
       createdAt: Date.now(),
+      updatedAt: Date.now(),
       isDemo: false,
       type: 'POST',
-      status: 'LIVE'
+      status,
+      allowIndex
     });
+    await set(newRef, payload);
     return newId;
   }
 }
