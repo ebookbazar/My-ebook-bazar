@@ -395,58 +395,225 @@ export function sanitizeObjectForFirebase<T>(data: T): T {
   return data;
 }
 
+export const LOCAL_STORAGE_BLOGS_KEY = 'ebookbazar_saved_blogs';
+export const LOCAL_STORAGE_HIDE_DEMO_KEY = 'ebookbazar_hide_demo_blogs';
+export const LOCAL_STORAGE_DELETED_KEY = 'ebookbazar_deleted_blog_ids';
+
 /**
- * Saves a real blog post to Firebase RTDB
+ * Retrieve list of deleted blog post IDs/slugs to prevent re-appearance
+ */
+export function getDeletedBlogIds(): string[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_DELETED_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Record a deleted blog post ID or slug
+ */
+export function addDeletedBlogId(id: string, slug?: string): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const current = getDeletedBlogIds();
+    const set = new Set(current);
+    if (id) set.add(id);
+    if (slug) set.add(slug);
+    localStorage.setItem(LOCAL_STORAGE_DELETED_KEY, JSON.stringify(Array.from(set)));
+  } catch (err) {
+    console.warn('Failed to add deleted blog ID:', err);
+  }
+}
+
+/**
+ * Retrieve saved blog posts from local storage cache
+ */
+export function getLocalStoredBlogs(): BlogPost[] {
+  if (typeof window === 'undefined') return [];
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_BLOGS_KEY);
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const deletedSet = new Set(getDeletedBlogIds());
+
+    if (Array.isArray(parsed)) {
+      return parsed
+        .filter(item => item && typeof item === 'object' && item.title)
+        .filter(item => !deletedSet.has(item.id) && !(item.slug && deletedSet.has(item.slug)))
+        .map(item => ({
+          ...item,
+          isDemo: false,
+          type: item.type || 'POST',
+          status: item.status || 'LIVE'
+        }));
+    }
+  } catch (err) {
+    console.warn('Failed to parse locally stored blogs:', err);
+  }
+  return [];
+}
+
+/**
+ * Persist blog posts array to local storage cache
+ */
+export function saveLocalStoredBlogs(posts: BlogPost[]): void {
+  if (typeof window === 'undefined') return;
+  try {
+    const realPosts = posts.filter(p => !p.isDemo);
+    localStorage.setItem(LOCAL_STORAGE_BLOGS_KEY, JSON.stringify(realPosts));
+  } catch (err) {
+    console.warn('Failed to save blogs to localStorage:', err);
+  }
+}
+
+/**
+ * Retrieve hideDemoBlogs preference from local storage cache
+ */
+export function getLocalHideDemoBlogs(): boolean {
+  if (typeof window === 'undefined') return false;
+  try {
+    return localStorage.getItem(LOCAL_STORAGE_HIDE_DEMO_KEY) === 'true';
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Persist hideDemoBlogs preference to local storage cache
+ */
+export function setLocalHideDemoBlogs(hide: boolean): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_HIDE_DEMO_KEY, hide ? 'true' : 'false');
+  } catch {}
+}
+
+/**
+ * Get initial posts merging Blogger DOM and Local Storage cache
+ */
+export function getInitialBlogPosts(): BlogPost[] {
+  const domPosts = extractBloggerPostsFromDOM();
+  const localPosts = getLocalStoredBlogs();
+  const deletedSet = new Set(getDeletedBlogIds());
+  
+  const map = new Map<string, BlogPost>();
+  domPosts.forEach(p => {
+    if (!deletedSet.has(p.id) && !(p.slug && deletedSet.has(p.slug))) {
+      map.set(p.id, p);
+    }
+  });
+  localPosts.forEach(p => {
+    if (!deletedSet.has(p.id) && !(p.slug && deletedSet.has(p.slug))) {
+      map.set(p.id, p);
+    }
+  });
+  
+  return Array.from(map.values());
+}
+
+/**
+ * Saves a real blog post with Dual-Layer Persistence:
+ * 1. Synchronously updates local storage cache (never lost on logout, reload, or network interruption)
+ * 2. Writes to Firebase RTDB primary path (/blogs)
+ * 3. Also mirrors to Firebase RTDB public node (/ebooks/_blogs) for unauthenticated / logged-out visitors
  */
 export async function saveBlogPostToFirebase(post: Omit<BlogPost, 'id'> & { id?: string }): Promise<string> {
   const blogsRef = ref(db, 'blogs');
   const status = post.status || 'LIVE';
   const allowIndex = post.allowIndex !== undefined ? post.allowIndex : (status === 'LIVE');
+  const now = Date.now();
 
-  if (post.id && !post.id.startsWith('post-')) {
-    // update existing
-    const singleRef = ref(db, `blogs/${post.id}`);
-    const payload = sanitizeObjectForFirebase({ 
-      ...post, 
-      updatedAt: Date.now(), 
-      isDemo: false, 
-      type: 'POST', 
-      status,
-      allowIndex
-    });
-    await set(singleRef, payload);
-    return post.id;
-  } else {
-    // create new
-    const newRef = push(blogsRef);
-    const newId = newRef.key as string;
-    const payload = sanitizeObjectForFirebase({
-      ...post,
-      id: newId,
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-      isDemo: false,
-      type: 'POST',
-      status,
-      allowIndex
-    });
-    await set(newRef, payload);
-    return newId;
+  const isExisting = Boolean(post.id && !post.id.startsWith('post-'));
+  const targetId = isExisting ? (post.id as string) : (push(blogsRef).key || `blog-${now}`);
+
+  const completePost: BlogPost = {
+    ...post,
+    id: targetId,
+    createdAt: (post as any).createdAt || now,
+    updatedAt: now,
+    isDemo: false,
+    type: 'POST',
+    status,
+    allowIndex
+  };
+
+  // 1. Immediate local cache write (Dual-Layer persistence guarantee)
+  try {
+    const existing = getLocalStoredBlogs();
+    const map = new Map<string, BlogPost>();
+    existing.forEach(p => map.set(p.id, p));
+    map.set(targetId, completePost);
+    saveLocalStoredBlogs(Array.from(map.values()));
+  } catch (err) {
+    console.warn('Failed to mirror post to local storage cache:', err);
   }
+
+  // 2. Prepare sanitized payload for Firebase RTDB
+  const payload = sanitizeObjectForFirebase(completePost);
+
+  // 3. Write to primary /blogs node
+  const singleRef = ref(db, `blogs/${targetId}`);
+  const primaryWrite = set(singleRef, payload).catch((err) => {
+    console.warn('Primary Firebase /blogs write notice:', err);
+  });
+
+  // 4. Dual-layer mirror to /ebooks/_blogs node (since /ebooks has public read in RTDB)
+  const mirrorRef = ref(db, `ebooks/_blogs/${targetId}`);
+  const mirrorWrite = set(mirrorRef, payload).catch((err) => {
+    console.warn('Mirror Firebase /ebooks/_blogs write notice:', err);
+  });
+
+  await Promise.allSettled([primaryWrite, mirrorWrite]);
+
+  return targetId;
 }
 
 /**
- * Deletes a blog post from Firebase RTDB
+ * Deletes a blog post from both Local Storage cache and Firebase RTDB
+ * Accepts either post ID string or entire BlogPost object
  */
-export async function deleteBlogPostFromFirebase(id: string): Promise<void> {
+export async function deleteBlogPostFromFirebase(target: string | BlogPost): Promise<void> {
+  const id = typeof target === 'string' ? target : target.id;
+  const slug = typeof target === 'string' ? undefined : target.slug;
+
+  // 1. Record in deleted list to permanently prevent ghost re-appearance from feeds/DOM
+  addDeletedBlogId(id, slug);
+
+  // 2. Delete from local storage cache immediately
+  try {
+    const existing = getLocalStoredBlogs();
+    const filtered = existing.filter(p => p.id !== id && (!slug || p.slug !== slug));
+    saveLocalStoredBlogs(filtered);
+  } catch (err) {
+    console.warn('Failed to delete from local cache:', err);
+  }
+
+  // 3. Delete from Firebase RTDB nodes
   const postRef = ref(db, `blogs/${id}`);
-  await remove(postRef);
+  const mirrorRef = ref(db, `ebooks/_blogs/${id}`);
+  const deletedLogRef = ref(db, `ebooks/_deletedBlogs/${id}`);
+  
+  await Promise.allSettled([
+    remove(postRef).catch((err) => console.warn('Firebase /blogs delete notice:', err)),
+    remove(mirrorRef).catch((err) => console.warn('Firebase /ebooks/_blogs delete notice:', err)),
+    set(deletedLogRef, true).catch(() => {})
+  ]);
 }
 
 /**
- * Permanently hides / deletes all demo blog posts in system settings
+ * Permanently hides / deletes all demo blog posts in system settings & local cache
  */
 export async function setHideDemoBlogsSetting(hide: boolean): Promise<void> {
+  setLocalHideDemoBlogs(hide);
+
   const settingRef = ref(db, 'settings/hideDemoBlogs');
-  await set(settingRef, hide);
+  const mirrorSettingRef = ref(db, 'ebooks/_settings/hideDemoBlogs');
+
+  await Promise.allSettled([
+    set(settingRef, hide).catch(() => {}),
+    set(mirrorSettingRef, hide).catch(() => {})
+  ]);
 }

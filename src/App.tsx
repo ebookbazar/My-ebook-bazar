@@ -49,7 +49,17 @@ import { CuratedPicksSection } from './components/CuratedPicksSection';
 import { FloatingSearch } from './components/FloatingSearch';
 import { LiveChatWidget } from './components/LiveChatWidget';
 import { AppDownloadBanner } from './components/AppDownloadBanner';
-import { extractBloggerPostsFromDOM, fetchBloggerFeedPosts, setHideDemoBlogsSetting } from './services/blogService';
+import { 
+  extractBloggerPostsFromDOM, 
+  fetchBloggerFeedPosts, 
+  setHideDemoBlogsSetting,
+  getLocalStoredBlogs,
+  saveLocalStoredBlogs,
+  getLocalHideDemoBlogs,
+  setLocalHideDemoBlogs,
+  getInitialBlogPosts,
+  getDeletedBlogIds
+} from './services/blogService';
 import { Ebook, BlogPost, AppDownloadSettings, DEFAULT_APP_DOWNLOAD_SETTINGS } from './types';
 import { INITIAL_EBOOKS } from './data/initialEbooks';
 import { BLOG_POSTS } from './data/blogPosts';
@@ -96,16 +106,18 @@ function MainApp() {
   // PDF In-App Reader State
   const [readingPdf, setReadingPdf] = useState<{ url: string; title: string } | null>(null);
 
-  // Dynamic Blog Posts (Blogger DOM Bridge + Firebase RTDB + Demo fallback)
-  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
-    if (typeof document !== 'undefined') {
-      const domPosts = extractBloggerPostsFromDOM();
-      if (domPosts.length > 0) return domPosts;
-    }
-    return BLOG_POSTS;
-  });
-  const [hideDemoBlogs, setHideDemoBlogs] = useState<boolean>(false);
+  // Dynamic Blog Posts (Blogger DOM Bridge + Local Storage Cache + Firebase RTDB + Demo fallback)
+  const [hideDemoBlogs, setHideDemoBlogs] = useState<boolean>(() => getLocalHideDemoBlogs());
   const [isAdminBlogManagerOpen, setIsAdminBlogManagerOpen] = useState<boolean>(false);
+
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
+    const initialReal = getInitialBlogPosts();
+    if (initialReal.length > 0) {
+      return initialReal;
+    }
+    const hideDemo = getLocalHideDemoBlogs();
+    return hideDemo ? [] : BLOG_POSTS;
+  });
 
   // Ebooks from Firebase + Initial Fallback
   const [ebooks, setEbooks] = useState<Ebook[]>(INITIAL_EBOOKS);
@@ -262,59 +274,90 @@ function MainApp() {
     return () => unsub();
   }, []);
 
-  // Realtime sync for Blog Posts from Blogger DOM Bridge, Blogger Public Feed API, & Firebase RTDB
+  // Realtime sync for Blog Posts from Blogger DOM Bridge, Blogger Public Feed API, Local Cache & Firebase RTDB
   useEffect(() => {
     // 1. Check Blogger DOM Bridge (Instant)
     const domPosts = extractBloggerPostsFromDOM();
     if (domPosts.length > 0) {
-      setBlogPosts(domPosts);
+      setBlogPosts(prev => {
+        const map = new Map<string, BlogPost>();
+        domPosts.forEach(p => map.set(p.id, p));
+        prev.forEach(p => {
+          if (!map.has(p.id)) map.set(p.id, p);
+        });
+        const updated = Array.from(map.values());
+        saveLocalStoredBlogs(updated.filter(p => !p.isDemo));
+        return updated;
+      });
     }
 
     // 2. Fetch Blogger Public Feed (Auto-discovers new posts without manual rebuilds)
     fetchBloggerFeedPosts().then((feedPosts) => {
       if (feedPosts && feedPosts.length > 0) {
         setBlogPosts(prev => {
-          // Merge DOM posts and Feed posts by ID avoiding duplicates
           const map = new Map<string, BlogPost>();
           feedPosts.forEach(p => map.set(p.id, p));
           prev.filter(p => !p.isDemo).forEach(p => map.set(p.id, p));
-          return Array.from(map.values());
+          const updated = Array.from(map.values());
+          saveLocalStoredBlogs(updated.filter(p => !p.isDemo));
+          return updated;
         });
       }
     }).catch(() => {});
 
-    // 3. Firebase RTDB /blogs listener
-    const blogsRef = ref(db, 'blogs');
-    const unsubBlogs = onValue(blogsRef, (snap) => {
-      if (snap.exists()) {
-        const val = snap.val();
-        const fbPosts: BlogPost[] = Object.keys(val).map(key => ({
+    // Common snapshot processor for Firebase blog nodes
+    const handleFirebaseBlogsSnapshot = (snap: any) => {
+      if (!snap.exists()) return;
+      const val = snap.val();
+      if (!val || typeof val !== 'object') return;
+
+      const deletedSet = new Set(getDeletedBlogIds());
+      const fbPosts: BlogPost[] = Object.keys(val)
+        .filter(key => !deletedSet.has(key))
+        .map(key => ({
           ...val[key],
           id: key,
           isDemo: false
-        }));
-        if (fbPosts.length > 0) {
-          setBlogPosts(prev => {
-            const map = new Map<string, BlogPost>();
-            // Keep existing real posts from Blogger DOM / feed
-            prev.filter(p => !p.isDemo).forEach(p => map.set(p.id, p));
-            // Add or update from Firebase
-            fbPosts.forEach(p => map.set(p.id, p));
-            return Array.from(map.values());
-          });
-        }
-      }
+        }))
+        .filter(p => !deletedSet.has(p.id) && !(p.slug && deletedSet.has(p.slug)));
+
+      setBlogPosts(prev => {
+        const map = new Map<string, BlogPost>();
+        // Keep existing real posts from Blogger DOM / feed / local
+        prev.filter(p => !p.isDemo && !deletedSet.has(p.id) && !(p.slug && deletedSet.has(p.slug))).forEach(p => map.set(p.id, p));
+        // Add or update from Firebase
+        fbPosts.forEach(p => map.set(p.id, p));
+        const merged = Array.from(map.values());
+        // Save merged real posts to local cache
+        saveLocalStoredBlogs(merged);
+        return merged;
+      });
+    };
+
+    // 3. Primary Firebase RTDB /blogs listener (with error handler for unauthenticated state)
+    const blogsRef = ref(db, 'blogs');
+    const unsubBlogs = onValue(blogsRef, handleFirebaseBlogsSnapshot, (err) => {
+      console.warn('Firebase RTDB /blogs read restricted (using mirror/cache fallback):', err?.message);
     });
 
-    // 4. Settings for hideDemoBlogs
-    const hideDemoRef = ref(db, 'settings/hideDemoBlogs');
-    const unsubHideDemo = onValue(hideDemoRef, (snap) => {
+    // 4. Dual-Layer Public Mirror /ebooks/_blogs listener (Publicly accessible in RTDB for all visitors & post-logout)
+    const mirrorBlogsRef = ref(db, 'ebooks/_blogs');
+    const unsubMirrorBlogs = onValue(mirrorBlogsRef, handleFirebaseBlogsSnapshot, (err) => {
+      console.warn('Firebase RTDB /ebooks/_blogs mirror notice:', err?.message);
+    });
+
+    // 5. Settings for hideDemoBlogs (Both primary and mirror nodes)
+    const handleHideDemoSnap = (snap: any) => {
       if (snap.exists()) {
-        setHideDemoBlogs(Boolean(snap.val()));
+        const val = Boolean(snap.val());
+        setHideDemoBlogs(val);
+        setLocalHideDemoBlogs(val);
       }
-    });
+    };
+    const unsubHideDemo = onValue(ref(db, 'settings/hideDemoBlogs'), handleHideDemoSnap, () => {});
+    const unsubMirrorHideDemo = onValue(ref(db, 'ebooks/_settings/hideDemoBlogs'), handleHideDemoSnap, () => {});
 
-    // 5. Blogger post item route detection
+    // 6. Blogger post item route detection
     if (typeof window !== 'undefined') {
       const win = window as any;
       if (win.__BLOGGER_PAGE_TYPE__ === 'item' && win.__BLOGGER_POST_ID__) {
@@ -329,7 +372,9 @@ function MainApp() {
 
     return () => {
       unsubBlogs();
+      unsubMirrorBlogs();
       unsubHideDemo();
+      unsubMirrorHideDemo();
     };
   }, []);
 
@@ -1404,8 +1449,12 @@ function MainApp() {
         posts={blogPosts}
         allEbooks={ebooks}
         onRefresh={() => {
-          const p = extractBloggerPostsFromDOM();
-          if (p.length > 0) setBlogPosts(p);
+          const localPosts = getLocalStoredBlogs();
+          const domPosts = extractBloggerPostsFromDOM();
+          const map = new Map<string, BlogPost>();
+          domPosts.forEach(p => map.set(p.id, p));
+          localPosts.forEach(p => map.set(p.id, p));
+          setBlogPosts(Array.from(map.values()));
         }}
         hideDemoBlogs={hideDemoBlogs}
       />

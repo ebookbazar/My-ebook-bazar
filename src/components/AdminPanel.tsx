@@ -212,6 +212,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
   const [selectedEbookFilter, setSelectedEbookFilter] = useState<'all' | 'pending' | 'published' | 'rejected'>('all');
   const [selectedOrderFilter, setSelectedOrderFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
   const [selectedWithdrawFilter, setSelectedWithdrawFilter] = useState<'all' | 'pending' | 'completed' | 'rejected'>('all');
+  const [rulesTab, setRulesTab] = useState<'firestore' | 'rtdb'>('firestore');
   
   // Modal & Form States
   const [viewingItem, setViewingItem] = useState<any | null>(null);
@@ -2348,15 +2349,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
               <span>ব্লগ পোস্ট ও ডেমো</span>
             </button>
           )}
-
-          <button
-            onClick={handleLogout}
-            className="ml-auto px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap bg-rose-600/90 hover:bg-rose-600 text-white font-bold text-xs shadow-xs active:scale-95"
-            title="লগআউট করুন এবং লগইন স্ক্রিন দেখুন"
-          >
-            <LogOut className="w-3.5 h-3.5" />
-            <span>লগআউট</span>
-          </button>
         </div>
 
         {/* Action Toast Banner */}
@@ -2424,15 +2416,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
                   >
                     <Home className="w-4 h-4 text-amber-300" />
                     <span>ওয়েবসাইট হোম</span>
-                  </button>
-
-                  <button
-                    onClick={handleLogout}
-                    className="flex-1 sm:flex-none bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition shadow-xs active:scale-95"
-                    title="লগআউট করুন এবং লগইন উইন্ডো দেখুন"
-                  >
-                    <LogOut className="w-4 h-4" />
-                    <span>লগআউট (Logout)</span>
                   </button>
 
                   <button
@@ -3880,30 +3863,146 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
           {/* TAB 11: FIREBASE SECURITY RULES */}
           {activeTab === 'rules' && (
             <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200 shadow-sm space-y-4">
-              <div className="border-b border-slate-100 pb-3 flex justify-between items-center">
+              <div className="border-b border-slate-100 pb-3 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
                 <div>
-                  <h3 className="font-black text-slate-900 text-base">Firebase Realtime Database Security Rules</h3>
+                  <h3 className="font-black text-slate-900 text-base">
+                    {rulesTab === 'firestore' ? 'Firebase Cloud Firestore Security Rules' : 'Firebase Realtime Database Security Rules'}
+                  </h3>
                   <p className="text-xs text-slate-500">
-                    এই রুলসগুলো Firebase Console &gt; Realtime Database &gt; Rules-এ পেস্ট করে Publish করুন।
+                    {rulesTab === 'firestore' 
+                      ? 'Firebase Console > Firestore Database > Rules ট্যাবে পেস্ট করে Publish করুন।' 
+                      : 'Firebase Console > Realtime Database > Rules ট্যাবে পেস্ট করে Publish করুন।'}
                   </p>
                 </div>
-                <button
-                  type="button"
-                  onClick={() => {
-                    const rules = document.getElementById('firebase-rules-code')?.textContent || '';
-                    navigator.clipboard.writeText(rules).then(() => alert('Firebase Rules সফলভাবে ক্লিপবোর্ডে কপি হয়েছে!'));
-                  }}
-                  className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow flex items-center gap-1.5"
-                >
-                  <Copy className="w-3.5 h-3.5" />
-                  <span>রুলস কপি করুন</span>
-                </button>
+                <div className="flex items-center gap-2">
+                  <div className="bg-slate-100 p-1 rounded-xl flex items-center gap-1 text-xs font-bold">
+                    <button
+                      type="button"
+                      onClick={() => setRulesTab('firestore')}
+                      className={`px-3 py-1.5 rounded-lg transition ${
+                        rulesTab === 'firestore' ? 'bg-[#15803d] text-white shadow' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Firestore Rules
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setRulesTab('rtdb')}
+                      className={`px-3 py-1.5 rounded-lg transition ${
+                        rulesTab === 'rtdb' ? 'bg-[#15803d] text-white shadow' : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      Realtime DB Rules
+                    </button>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const id = rulesTab === 'firestore' ? 'firestore-rules-code' : 'firebase-rules-code';
+                      const rules = document.getElementById(id)?.textContent || '';
+                      navigator.clipboard.writeText(rules).then(() => alert(`${rulesTab === 'firestore' ? 'Firestore' : 'Realtime Database'} Rules সফলভাবে ক্লিপবোর্ডে কপি হয়েছে!`));
+                    }}
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white px-3.5 py-1.5 rounded-xl text-xs font-black shadow flex items-center gap-1.5"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>কপি করুন</span>
+                  </button>
+                </div>
               </div>
 
-              <pre 
-                id="firebase-rules-code"
-                className="bg-slate-950 text-emerald-400 font-mono text-xs p-5 rounded-2xl overflow-x-auto leading-relaxed max-h-96"
-              >
+              {rulesTab === 'firestore' ? (
+                <pre 
+                  id="firestore-rules-code"
+                  className="bg-slate-950 text-emerald-400 font-mono text-xs p-5 rounded-2xl overflow-x-auto leading-relaxed max-h-96"
+                >
+{`rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Helper function to verify admin authorization
+    function isAdmin() {
+      return request.auth != null && (
+        request.auth.token.email in ['suma47083@gmail.com', 'admin@ebookbazar.com', 'redx0187@gmail.com'] ||
+        (exists(/databases/$(database)/documents/admins/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/admins/$(request.auth.uid)).data.active != false) ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
+      );
+    }
+
+    // Blog Posts Collection: /blogs/{blogId}
+    match /blogs/{blogId} {
+      // 1. Public Read: Any visitor or reader can view published blog posts
+      allow read: if true;
+
+      // 2. Create & Update: Only authenticated authorized admins
+      allow create, update: if isAdmin();
+
+      // 3. Delete: ONLY authenticated authorized admin (Strictly blocked for public & regular users)
+      allow delete: if isAdmin();
+    }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (request.auth.uid == userId || isAdmin());
+    }
+
+    // Admins Collection
+    match /admins/{adminId} {
+      allow read: if request.auth != null;
+      allow write: if isAdmin();
+    }
+
+    // Sellers Collection
+    match /sellers/{sellerId} {
+      allow read: if true;
+      allow write: if request.auth != null && (request.auth.uid == sellerId || isAdmin());
+    }
+
+    // eBooks Collection
+    match /ebooks/{ebookId} {
+      allow read: if true;
+      allow write: if request.auth != null && (
+        !exists(/databases/$(database)/documents/ebooks/$(ebookId)) ||
+        resource.data.sellerId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Orders Collection
+    match /orders/{orderId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        !exists(/databases/$(database)/documents/orders/$(orderId)) ||
+        resource.data.buyerId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+
+    // Settings Collection
+    match /settings/{settingId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Support Tickets Collection
+    match /supportTickets/{ticketId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && (
+        !exists(/databases/$(database)/documents/supportTickets/$(ticketId)) ||
+        resource.data.userId == request.auth.uid ||
+        isAdmin()
+      );
+    }
+  }
+}`}
+                </pre>
+              ) : (
+                <pre 
+                  id="firebase-rules-code"
+                  className="bg-slate-950 text-emerald-400 font-mono text-xs p-5 rounded-2xl overflow-x-auto leading-relaxed max-h-96"
+                >
 {`{
   "rules": {
     "users": {
@@ -3915,11 +4014,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
     "sellers": {
       "$uid": {
         ".read": "true",
-        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
+        ".write": "auth != null && (auth.uid === $uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
       }
     },
     "ebooks": {
       ".read": "true",
+      "_blogs": {
+        "$blogId": {
+          ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com' || auth.token.email === 'redx0187@gmail.com')"
+        }
+      },
       "$bookId": {
         ".write": "auth != null && (!data.exists() || data.child('sellerId').val() === auth.uid || root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
       }
@@ -3960,15 +4064,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
     },
     "settings": {
       ".read": "true",
-      ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
-    },
-    "appDownload": {
-      ".read": "true",
-      "downloads": {
-        ".write": "true"
-      },
-      "downloadCount": {
-        ".write": "true"
+      "appDownload": {
+        "downloadCount": {
+          ".write": "true"
+        },
+        "count": {
+          ".write": "true"
+        }
       },
       ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com')"
     },
@@ -4002,7 +4104,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, onOpenReader, o
     }
   }
 }`}
-              </pre>
+                </pre>
+              )}
             </div>
           )}
 

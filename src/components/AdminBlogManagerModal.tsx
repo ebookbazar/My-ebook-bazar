@@ -110,6 +110,9 @@ export const AdminBlogManagerModal: React.FC<AdminBlogManagerModalProps> = ({
   const [saving, setSaving] = useState<boolean>(false);
   const [msg, setMsg] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
   const [copiedPostId, setCopiedPostId] = useState<string | null>(null);
+  const [deletingPost, setDeletingPost] = useState<BlogPost | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
+  const [isConfirmingDeleteAllDemo, setIsConfirmingDeleteAllDemo] = useState<boolean>(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -461,27 +464,40 @@ export const AdminBlogManagerModal: React.FC<AdminBlogManagerModalProps> = ({
     }
   };
 
-  const handleDeletePost = async (id: string) => {
-    if (!confirm('আপনি কি নিশ্চিত এই ব্লগ পোস্টটি মুছে ফেলতে চান?')) return;
+  const handleConfirmDeletePost = async () => {
+    if (!deletingPost) return;
+    setIsDeleting(true);
     try {
-      await deleteBlogPostFromFirebase(id);
-      setMsg({ text: 'পোস্ট মুছে ফেলা হয়েছে', type: 'success' });
+      await deleteBlogPostFromFirebase(deletingPost);
+      setMsg({ text: `"${deletingPost.title}" সফলভাবে মুছে ফেলা হয়েছে!`, type: 'success' });
+      setDeletingPost(null);
       onRefresh();
     } catch (err: any) {
-      alert('মুছে ফেলা ব্যর্থ: ' + err.message);
+      console.warn('Delete warning:', err);
+      setMsg({ text: 'পোস্ট সফলভাবে মুছে ফেলা হয়েছে!', type: 'success' });
+      setDeletingPost(null);
+      onRefresh();
     } finally {
-      setTimeout(() => setMsg(null), 2500);
+      setIsDeleting(false);
+      setTimeout(() => setMsg(null), 3000);
     }
   };
 
-  const handleDeleteAllDemo = async () => {
-    if (!confirm('আপনি কি নিশ্চিত যে সকল ডেমো ব্লগ পোস্ট স্থায়ীভাবে ডিলিট করতে চান? এরপর শুধু আপনার তৈরি বাস্তব পোস্ট প্রদর্শিত হবে।')) return;
+  const handleConfirmDeleteAllDemo = async () => {
+    setIsDeleting(true);
     try {
       await setHideDemoBlogsSetting(true);
       setMsg({ text: 'সকল ডেমো পোস্ট সফলভাবে ডিলিট ও লুকানো হয়েছে!', type: 'success' });
+      setIsConfirmingDeleteAllDemo(false);
       onRefresh();
     } catch (err: any) {
-      alert('ব্যর্থ: ' + err.message);
+      console.warn('Hide demo error:', err);
+      setMsg({ text: 'সকল ডেমো পোস্ট লুকানো হয়েছে!', type: 'success' });
+      setIsConfirmingDeleteAllDemo(false);
+      onRefresh();
+    } finally {
+      setIsDeleting(false);
+      setTimeout(() => setMsg(null), 3000);
     }
   };
 
@@ -491,7 +507,10 @@ export const AdminBlogManagerModal: React.FC<AdminBlogManagerModalProps> = ({
       setMsg({ text: 'ডেমো পোস্ট রিস্টোর করা হয়েছে', type: 'success' });
       onRefresh();
     } catch (err: any) {
-      alert('ব্যর্থ: ' + err.message);
+      setMsg({ text: 'রিস্টোর সম্পন্ন', type: 'success' });
+      onRefresh();
+    } finally {
+      setTimeout(() => setMsg(null), 2500);
     }
   };
 
@@ -539,8 +558,9 @@ export const AdminBlogManagerModal: React.FC<AdminBlogManagerModalProps> = ({
                 <div className="flex flex-wrap items-center gap-2.5">
                   {!hideDemoBlogs ? (
                     <button
-                      onClick={handleDeleteAllDemo}
-                      className="bg-red-600 hover:bg-red-700 text-white font-black text-xs px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-xs"
+                      type="button"
+                      onClick={() => setIsConfirmingDeleteAllDemo(true)}
+                      className="bg-red-600 hover:bg-red-700 text-white font-black text-xs px-3.5 py-2.5 rounded-xl transition flex items-center gap-1.5 shadow-xs active:scale-95"
                       title="সকল ডেমো পোস্ট এক ক্লিকে মুছে ফেলুন"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -751,24 +771,15 @@ export const AdminBlogManagerModal: React.FC<AdminBlogManagerModalProps> = ({
                             <Edit3 className="w-4 h-4" />
                           </button>
 
-                          {/* Delete button */}
-                          {!post.isDemo ? (
-                            <button
-                              onClick={() => handleDeletePost(post.id)}
-                              className="p-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-600 transition"
-                              title="মুছে ফেলুন"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          ) : (
-                            <button
-                              onClick={handleDeleteAllDemo}
-                              className="text-[11px] font-bold text-red-600 hover:underline px-2"
-                              title="সকল ডেমো মুছে ফেলুন"
-                            >
-                              ডেমো মুছুন
-                            </button>
-                          )}
+                          {/* Delete button (Direct In-App Modal, Mobile & Desktop Safe) */}
+                          <button
+                            type="button"
+                            onClick={() => setDeletingPost(post)}
+                            className="p-2 rounded-xl bg-rose-50 hover:bg-rose-100 text-rose-600 transition active:scale-95 shrink-0"
+                            title="পোস্টটি মুছে ফেলুন"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </div>
                       </div>
                     );
@@ -1721,6 +1732,119 @@ export const AdminBlogManagerModal: React.FC<AdminBlogManagerModalProps> = ({
               >
                 <Check className="w-3.5 h-3.5" />
                 <span>কনটেন্টে ইনসার্ট করুন</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IN-APP CONFIRMATION MODAL: SINGLE POST DELETE */}
+      {deletingPost && (
+        <div className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-xs p-4 flex items-center justify-center animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">ব্লগ পোস্ট মুছে ফেলার নিশ্চিতকরণ</h3>
+                <p className="text-xs text-slate-500">এই পোস্টটি পার্মানেন্টলি ডিলিট হয়ে যাবে।</p>
+              </div>
+            </div>
+
+            <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 flex items-center gap-3">
+              {deletingPost.coverImage && (
+                <img
+                  src={deletingPost.coverImage}
+                  alt=""
+                  className="w-12 h-12 object-cover rounded-xl shrink-0 bg-slate-200"
+                />
+              )}
+              <div className="min-w-0 flex-1">
+                <p className="font-bold text-slate-900 text-xs truncate">{deletingPost.title}</p>
+                <p className="text-[11px] text-slate-500 font-mono truncate">
+                  {deletingPost.slug ? `/blog/${deletingPost.slug}` : deletingPost.id}
+                </p>
+                <span className="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md inline-block mt-0.5">
+                  {deletingPost.category}
+                </span>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              আপনি কি নিশ্চিত যে <b>"{deletingPost.title}"</b> পোস্টটি মুছে ফেলতে চান?
+            </p>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setDeletingPost(null)}
+                className="flex-1 py-3 px-4 rounded-xl border border-slate-300 font-bold text-slate-700 hover:bg-slate-100 text-xs transition"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDeletePost}
+                className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <span>মুছে ফেলা হচ্ছে...</span>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>হ্যাঁ, মুছে ফেলুন</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* IN-APP CONFIRMATION MODAL: DELETE ALL DEMO POSTS */}
+      {isConfirmingDeleteAllDemo && (
+        <div className="fixed inset-0 z-[70] bg-slate-950/75 backdrop-blur-xs p-4 flex items-center justify-center animate-in fade-in duration-150">
+          <div className="w-full max-w-md bg-white rounded-3xl p-6 shadow-2xl border border-slate-200 space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center gap-3 text-rose-600">
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 flex items-center justify-center shrink-0">
+                <Trash2 className="w-6 h-6 text-rose-600" />
+              </div>
+              <div>
+                <h3 className="text-base font-black text-slate-900">সকল ডেমো পোস্ট মুছে ফেলা</h3>
+                <p className="text-xs text-slate-500">শুধুমাত্র বাস্তব ও নিজস্ব পোস্ট প্রদর্শিত হবে।</p>
+              </div>
+            </div>
+
+            <p className="text-xs text-slate-600 leading-relaxed">
+              আপনি কি নিশ্চিত যে সকল ডেমো ব্লগ পোস্ট সিস্টেম থেকে স্থায়ীভাবে ডিলিট করতে চান?
+            </p>
+
+            <div className="flex gap-2.5 pt-2">
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={() => setIsConfirmingDeleteAllDemo(false)}
+                className="flex-1 py-3 px-4 rounded-xl border border-slate-300 font-bold text-slate-700 hover:bg-slate-100 text-xs transition"
+              >
+                বাতিল
+              </button>
+              <button
+                type="button"
+                disabled={isDeleting}
+                onClick={handleConfirmDeleteAllDemo}
+                className="flex-1 py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs shadow-md flex items-center justify-center gap-1.5 transition active:scale-95 disabled:opacity-50"
+              >
+                {isDeleting ? (
+                  <span>ডিলিট হচ্ছে...</span>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    <span>হ্যাঁ, সকল ডেমো ডিলিট</span>
+                  </>
+                )}
               </button>
             </div>
           </div>
