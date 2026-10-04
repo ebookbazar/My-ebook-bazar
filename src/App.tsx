@@ -18,7 +18,8 @@ import {
   Copy,
   Check,
   Calendar,
-  Clock
+  Clock,
+  Trophy
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
@@ -46,6 +47,7 @@ import { BlogView } from './components/BlogView';
 import { AdminBlogManagerModal } from './components/AdminBlogManagerModal';
 import { RealWebsiteStats } from './components/RealWebsiteStats';
 import { CuratedPicksSection } from './components/CuratedPicksSection';
+import { LeaderboardSection } from './components/LeaderboardSection';
 import { FloatingSearch } from './components/FloatingSearch';
 import { LiveChatWidget } from './components/LiveChatWidget';
 import { AppDownloadBanner } from './components/AppDownloadBanner';
@@ -60,10 +62,11 @@ import {
   getInitialBlogPosts,
   getDeletedBlogIds
 } from './services/blogService';
-import { Ebook, BlogPost, AppDownloadSettings, DEFAULT_APP_DOWNLOAD_SETTINGS } from './types';
+import { Ebook, BlogPost, AppDownloadSettings, DEFAULT_APP_DOWNLOAD_SETTINGS, EbookRatingSummary } from './types';
 import { INITIAL_EBOOKS } from './data/initialEbooks';
 import { BLOG_POSTS } from './data/blogPosts';
 import { db, ref, onValue, set, update } from './firebase';
+import { subscribeToAllRatingSummaries, getLocalRatingSummaries } from './services/ratingService';
 
 const CATEGORIES = [
   'সব বই',
@@ -121,6 +124,19 @@ function MainApp() {
 
   // Ebooks from Firebase + Initial Fallback
   const [ebooks, setEbooks] = useState<Ebook[]>(INITIAL_EBOOKS);
+
+  // Realtime 5-Star Rating Summaries for all eBooks across marketplace
+  const [ratingSummaries, setRatingSummaries] = useState<Record<string, EbookRatingSummary>>(() => 
+    getLocalRatingSummaries()
+  );
+
+  // Subscribe to realtime rating summaries
+  useEffect(() => {
+    const unsubRatings = subscribeToAllRatingSummaries((summaries) => {
+      setRatingSummaries(summaries);
+    });
+    return () => unsubRatings();
+  }, []);
 
   // Real Website Stats from Firebase RTDB (Total users, sellers, ebooks)
   const [totalUsersCount, setTotalUsersCount] = useState<number>(17);
@@ -674,6 +690,19 @@ function MainApp() {
                   <Users className="w-3.5 h-3.5 text-slate-700" />
                   <span>ইউজার ড্যাশবোর্ড (৪)</span>
                 </button>
+                <button
+                  onClick={() => {
+                    const el = document.getElementById('leaderboard');
+                    if (el) {
+                      el.scrollIntoView({ behavior: 'smooth' });
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-xs active:scale-95"
+                  title="🏆 ইউজার, সেলার ও ক্রেতাদের অভিজ্ঞতা ও মতামত"
+                >
+                  <Trophy className="w-3.5 h-3.5 text-amber-600 fill-amber-400" />
+                  <span>লিডারবোর্ড</span>
+                </button>
               </div>
             </div>
 
@@ -682,6 +711,7 @@ function MainApp() {
               ebooks={ebooks}
               onViewDetails={(book) => setSelectedEbook(book)}
               onBuyNow={handleBuyNow}
+              ratingSummaries={ratingSummaries}
             />
 
             {/* 6. জনপ্রিয় বিভাগ ও ফিল্টার সার্চ */}
@@ -817,11 +847,20 @@ function MainApp() {
                       ebook={book}
                       onViewDetails={(b) => setSelectedEbook(b)}
                       onBuyNow={handleBuyNow}
+                      ratingSummary={ratingSummaries[book.id]}
                     />
                   ))}
                 </div>
               )}
             </div>
+
+            {/* 7.5. 🏆 Leaderboard + Community Feedback Section */}
+            <LeaderboardSection
+              onOpenAuthModal={(mode) => {
+                setAuthInitialMode(mode || 'user-login');
+                setIsAuthOpen(true);
+              }}
+            />
 
             {/* 8. সর্বশেষ লেখা (Featured Real Blog Posts Section on Home, exactly 3 latest articles) */}
             <div className="pt-8 border-t border-slate-200 space-y-6">
@@ -1285,6 +1324,7 @@ function MainApp() {
         {currentView === 'seller-dashboard' && (
           <SellerDashboard
             onOpenReader={handleOpenPdfReader}
+            ratingSummaries={ratingSummaries}
             onNavigateHome={() => {
               setCurrentView('home');
               window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1403,6 +1443,11 @@ function MainApp() {
         onClose={() => setSelectedEbook(null)}
         onBuyNow={handleBuyNow}
         onOpenPreview={handleOpenPdfReader}
+        onOpenAuthModal={() => {
+          setIsAuthOpen(true);
+          setAuthInitialMode('user-login');
+        }}
+        ratingSummary={selectedEbook ? ratingSummaries[selectedEbook.id] : undefined}
       />
 
       {/* MODAL 2: CART MODAL */}
@@ -1439,6 +1484,7 @@ function MainApp() {
           }}
           onOpenReader={handleOpenPdfReader}
           onOpenBlogManager={() => setIsAdminBlogManagerOpen(true)}
+          ratingSummaries={ratingSummaries}
         />
       )}
 

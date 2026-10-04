@@ -25,17 +25,39 @@ import {
 } from 'lucide-react';
 import { useAuth, cleanFirebaseData } from '../context/AuthContext';
 import { db, ref, onValue, push, set, update, serverTimestamp } from '../firebase';
-import { Ebook, SellerProfile, WithdrawalRequest, MembershipRequest } from '../types';
+import { Ebook, SellerProfile, WithdrawalRequest, MembershipRequest, EbookRatingSummary } from '../types';
 import { SupportTicketSection } from './SupportTicketSection';
+import { StarRating } from './StarRating';
+import { subscribeToAllRatingSummaries, getLocalRatingSummaries } from '../services/ratingService';
 
 interface SellerDashboardProps {
   onOpenReader: (url: string, title: string) => void;
   onNavigateHome: () => void;
+  ratingSummaries?: Record<string, EbookRatingSummary>;
 }
 
-export const SellerDashboard: React.FC<SellerDashboardProps> = ({ onOpenReader, onNavigateHome }) => {
+export const SellerDashboard: React.FC<SellerDashboardProps> = ({ 
+  onOpenReader, 
+  onNavigateHome,
+  ratingSummaries: propsSummaries
+}) => {
   const { currentUser, userProfile, updateProfileData, login, logout } = useAuth();
   const rawSeller = userProfile as SellerProfile | null;
+
+  const [ratingSummaries, setRatingSummaries] = useState<Record<string, EbookRatingSummary>>(() => 
+    propsSummaries || getLocalRatingSummaries()
+  );
+
+  useEffect(() => {
+    if (propsSummaries) {
+      setRatingSummaries(propsSummaries);
+      return;
+    }
+    const unsub = subscribeToAllRatingSummaries((summaries) => {
+      setRatingSummaries(summaries);
+    });
+    return () => unsub();
+  }, [propsSummaries]);
 
   // Realtime seller profile state that updates dynamically when Admin approves membership or changes limit
   const [liveSeller, setLiveSeller] = useState<SellerProfile | null>(rawSeller);
@@ -765,6 +787,13 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ onOpenReader, 
                       <div className="truncate pr-2">
                         <p className="font-black text-slate-900 truncate">{b.title}</p>
                         <p className="text-[10px] text-slate-500">মূল্য: ৳{b.price} | {b.category}</p>
+                        <div className="mt-1">
+                          <StarRating
+                            rating={ratingSummaries[b.id]?.averageRating || 0}
+                            totalRatings={ratingSummaries[b.id]?.totalRatings || 0}
+                            size="xs"
+                          />
+                        </div>
                       </div>
                       <span className={`px-2 py-0.5 rounded-md text-[10px] font-black uppercase ${
                         b.status === 'published' ? 'bg-emerald-100 text-emerald-800' : b.status === 'rejected' ? 'bg-rose-100 text-rose-800' : 'bg-amber-100 text-amber-800'
@@ -863,6 +892,15 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({ onOpenReader, 
                       </span>
                       <h4 className="font-black text-slate-900 text-sm leading-snug truncate">{b.title}</h4>
                       <p className="text-xs text-slate-500 font-medium">৳{b.price} | {b.category}</p>
+                      
+                      {/* 5-Star Rating */}
+                      <div className="mt-1.5">
+                        <StarRating
+                          rating={ratingSummaries[b.id]?.averageRating || 0}
+                          totalRatings={ratingSummaries[b.id]?.totalRatings || 0}
+                          size="xs"
+                        />
+                      </div>
                     </div>
                   </div>
 

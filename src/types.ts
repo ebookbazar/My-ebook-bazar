@@ -245,6 +245,32 @@ export interface Review {
   createdAt: number;
 }
 
+export interface EbookRating {
+  id?: string;
+  bookId: string;
+  userId: string;
+  userName: string;
+  userEmail?: string;
+  rating: number; // 1 to 5
+  review?: string;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface EbookRatingSummary {
+  bookId: string;
+  averageRating: number; // e.g. 4.8
+  totalRatings: number; // e.g. 25
+  ratingCounts?: {
+    1?: number;
+    2?: number;
+    3?: number;
+    4?: number;
+    5?: number;
+  };
+  lastUpdated: number;
+}
+
 export interface LiveChatMessage {
   id: string;
   senderId: string;
@@ -323,6 +349,38 @@ export interface AppDownloadStats {
   daily?: Record<string, number>;
   lastClickAt?: number;
   resetAt?: number;
+}
+
+export type LeaderboardRole = 'User' | 'Seller' | 'Buyer';
+
+export type LeaderboardPostType = 
+  | 'Payment Experience'
+  | 'eBook Purchase Experience'
+  | 'Seller Experience'
+  | 'Problem / Issue'
+  | 'Suggestion'
+  | 'General Feedback';
+
+export interface AdminReply {
+  text: string;
+  adminId: string;
+  adminName: string;
+  createdAt: number;
+  updatedAt?: number;
+}
+
+export interface LeaderboardPost {
+  id: string;
+  userId: string;
+  name: string;
+  role: LeaderboardRole;
+  postType: LeaderboardPostType;
+  comment: string;
+  createdAt: number;
+  status: 'pending' | 'approved' | 'rejected';
+  approvedAt?: number;
+  rejectedAt?: number;
+  adminReply?: AdminReply | null;
 }
 
 

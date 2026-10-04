@@ -18,7 +18,8 @@ import {
   Crown,
   Sparkles,
   ChevronDown,
-  ChevronRight
+  ChevronRight,
+  Trophy
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -178,6 +179,22 @@ export const Header: React.FC<HeaderProps> = ({
               className={`hover:text-amber-300 transition py-1 ${currentView === 'membership' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
             >
               মেম্বারশিপ
+            </button>
+            <button 
+              onClick={() => { 
+                if (currentView !== 'home') {
+                  setCurrentView('home'); 
+                }
+                setTimeout(() => {
+                  const el = document.getElementById('leaderboard');
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }, 100);
+              }} 
+              className="hover:text-amber-300 transition flex items-center gap-1 py-1"
+              title="🏆 ইউজার, সেলার ও বায়ারদের অভিজ্ঞতা ও মতামত"
+            >
+              <Trophy className="w-3.5 h-3.5 text-amber-400" />
+              <span>লিডারবোর্ড</span>
             </button>
           </nav>
 
@@ -357,6 +374,22 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Crown className="w-4 h-4 text-amber-400" />
                 <span>মেম্বারশিপ</span>
+              </button>
+              <button 
+                onClick={() => { 
+                  if (currentView !== 'home') {
+                    setCurrentView('home'); 
+                  }
+                  setMobileMenuOpen(false);
+                  setTimeout(() => {
+                    const el = document.getElementById('leaderboard');
+                    if (el) el.scrollIntoView({ behavior: 'smooth' });
+                  }, 100);
+                }}
+                className="text-left p-2.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700/50 flex items-center gap-2 text-amber-300 font-bold"
+              >
+                <Trophy className="w-4 h-4 text-amber-400" />
+                <span>লিডারবোর্ড ও ফিডব্যাক</span>
               </button>
               <button 
                 onClick={() => { setCurrentView('faq'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}

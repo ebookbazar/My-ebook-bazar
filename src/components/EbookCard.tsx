@@ -1,16 +1,18 @@
 import React from 'react';
 import { ShoppingCart, Eye, Zap, BookOpen, Crown, ShoppingBag } from 'lucide-react';
-import { Ebook } from '../types';
+import { Ebook, EbookRatingSummary } from '../types';
 import { useCart } from '../context/CartContext';
 import { isEbookAdminOwned } from '../utils/ebookOwnership';
+import { StarRating } from './StarRating';
 
 interface EbookCardProps {
   ebook: Ebook;
   onViewDetails: (ebook: Ebook) => void;
   onBuyNow: (ebook: Ebook) => void;
+  ratingSummary?: EbookRatingSummary;
 }
 
-export const EbookCard: React.FC<EbookCardProps> = ({ ebook, onViewDetails, onBuyNow }) => {
+export const EbookCard: React.FC<EbookCardProps> = ({ ebook, onViewDetails, onBuyNow, ratingSummary }) => {
   const { addToCart } = useCart();
   const regularPrice = ebook.regularPrice || (ebook.discountPrice && ebook.discountPrice < ebook.price ? ebook.price : ebook.price);
   const salePrice = ebook.discountPrice ? Math.min(ebook.discountPrice, ebook.price) : (ebook.regularPrice && ebook.regularPrice > ebook.price ? ebook.price : ebook.price);
@@ -104,6 +106,16 @@ export const EbookCard: React.FC<EbookCardProps> = ({ ebook, onViewDetails, onBu
               সেলার: {ebook.sellerName}
             </p>
           )}
+
+          {/* 5-Star Rating */}
+          <div className="mt-2 pt-0.5">
+            <StarRating
+              rating={ratingSummary?.averageRating || 0}
+              totalRatings={ratingSummary?.totalRatings || 0}
+              size="xs"
+              compact={false}
+            />
+          </div>
         </div>
 
         <div className="pt-3 border-t border-slate-100 space-y-3">

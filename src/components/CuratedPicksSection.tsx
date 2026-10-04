@@ -1,19 +1,22 @@
 import React from 'react';
 import { Sparkles, Eye, ShoppingCart, Crown, ShoppingBag, ArrowRight } from 'lucide-react';
-import { Ebook } from '../types';
+import { Ebook, EbookRatingSummary } from '../types';
 import { useCart } from '../context/CartContext';
 import { isEbookAdminOwned } from '../utils/ebookOwnership';
+import { StarRating } from './StarRating';
 
 interface CuratedPicksSectionProps {
   ebooks: Ebook[];
   onViewDetails: (ebook: Ebook) => void;
   onBuyNow: (ebook: Ebook) => void;
+  ratingSummaries?: Record<string, EbookRatingSummary>;
 }
 
 export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = ({
   ebooks,
   onViewDetails,
-  onBuyNow
+  onBuyNow,
+  ratingSummaries = {}
 }) => {
   const { addToCart } = useCart();
 
@@ -102,6 +105,16 @@ export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = ({
                       <span className="inline-block text-[11px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-100">
                         {book.category || 'সাধারণ'}
                       </span>
+                    </div>
+
+                    {/* 5-Star Rating */}
+                    <div className="mt-2">
+                      <StarRating
+                        rating={ratingSummaries[book.id]?.averageRating || 0}
+                        totalRatings={ratingSummaries[book.id]?.totalRatings || 0}
+                        size="xs"
+                        compact={false}
+                      />
                     </div>
                   </div>
 
