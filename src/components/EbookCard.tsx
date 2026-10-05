@@ -12,7 +12,7 @@ interface EbookCardProps {
   ratingSummary?: EbookRatingSummary;
 }
 
-export const EbookCard: React.FC<EbookCardProps> = ({ ebook, onViewDetails, onBuyNow, ratingSummary }) => {
+export const EbookCard: React.FC<EbookCardProps> = React.memo(({ ebook, onViewDetails, onBuyNow, ratingSummary }) => {
   const { addToCart } = useCart();
   const regularPrice = ebook.regularPrice || (ebook.discountPrice && ebook.discountPrice < ebook.price ? ebook.price : ebook.price);
   const salePrice = ebook.discountPrice ? Math.min(ebook.discountPrice, ebook.price) : (ebook.regularPrice && ebook.regularPrice > ebook.price ? ebook.price : ebook.price);
@@ -52,6 +52,9 @@ export const EbookCard: React.FC<EbookCardProps> = ({ ebook, onViewDetails, onBu
         <img 
           src={ebook.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop'} 
           alt={ebook.title} 
+          width={300}
+          height={400}
+          decoding="async"
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
           loading="lazy"
         />
@@ -162,4 +165,4 @@ export const EbookCard: React.FC<EbookCardProps> = ({ ebook, onViewDetails, onBu
       </div>
     </div>
   );
-};
+});

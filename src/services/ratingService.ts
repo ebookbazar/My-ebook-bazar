@@ -351,6 +351,7 @@ export function subscribeToAllRatingSummaries(
   callback: (summaries: Record<string, EbookRatingSummary>) => void
 ): () => void {
   let unsubscribed = false;
+  let notifyTimer: any = null;
   const currentSummaries: Record<string, EbookRatingSummary> = { ...getLocalRatingSummaries() };
 
   // Immediate callback with cached summaries
@@ -359,8 +360,12 @@ export function subscribeToAllRatingSummaries(
   const mergeAndNotify = (newSummaries: Record<string, EbookRatingSummary>) => {
     if (unsubscribed) return;
     Object.assign(currentSummaries, newSummaries);
-    saveLocalRatingSummaries(currentSummaries);
-    callback({ ...currentSummaries });
+    if (notifyTimer) clearTimeout(notifyTimer);
+    notifyTimer = setTimeout(() => {
+      if (unsubscribed) return;
+      saveLocalRatingSummaries(currentSummaries);
+      callback({ ...currentSummaries });
+    }, 40);
   };
 
   // 1. Listen to /ratingSummary
@@ -409,6 +414,7 @@ export function subscribeToAllRatingSummaries(
 
   return () => {
     unsubscribed = true;
+    if (notifyTimer) clearTimeout(notifyTimer);
     unsubA();
     unsubB();
   };

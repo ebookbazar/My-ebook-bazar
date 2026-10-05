@@ -304,21 +304,26 @@ export function subscribeToApprovedLeaderboardPosts(
   callback: (posts: LeaderboardPost[]) => void
 ): () => void {
   let unsubscribed = false;
+  let timer: any = null;
 
   const handleSnap = (rawPosts: LeaderboardPost[]) => {
     if (unsubscribed) return;
-    const local = getLocalLeaderboardPosts();
-    const map = new Map<string, LeaderboardPost>();
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (unsubscribed) return;
+      const local = getLocalLeaderboardPosts();
+      const map = new Map<string, LeaderboardPost>();
 
-    // Seed local approved
-    local.filter(p => p.status === 'approved').forEach(p => map.set(p.id, p));
-    // Merge Firebase approved
-    rawPosts.filter(p => p.status === 'approved').forEach(p => map.set(p.id, p));
+      // Seed local approved
+      local.filter(p => p.status === 'approved').forEach(p => map.set(p.id, p));
+      // Merge Firebase approved
+      rawPosts.filter(p => p.status === 'approved').forEach(p => map.set(p.id, p));
 
-    const combined = Array.from(map.values()).sort(
-      (a, b) => (b.approvedAt || b.createdAt || 0) - (a.approvedAt || a.createdAt || 0)
-    );
-    callback(combined);
+      const combined = Array.from(map.values()).sort(
+        (a, b) => (b.approvedAt || b.createdAt || 0) - (a.approvedAt || a.createdAt || 0)
+      );
+      callback(combined);
+    }, 40);
   };
 
   // Immediate callback from cached approved posts
@@ -365,6 +370,7 @@ export function subscribeToApprovedLeaderboardPosts(
 
   return () => {
     unsubscribed = true;
+    if (timer) clearTimeout(timer);
     unsubA();
     unsubB();
   };
@@ -377,22 +383,27 @@ export function subscribeToAllLeaderboardPosts(
   callback: (posts: LeaderboardPost[]) => void
 ): () => void {
   let unsubscribed = false;
+  let timer: any = null;
 
   const handleSnap = (rawPosts: LeaderboardPost[]) => {
     if (unsubscribed) return;
-    const local = getLocalLeaderboardPosts();
-    const map = new Map<string, LeaderboardPost>();
+    if (timer) clearTimeout(timer);
+    timer = setTimeout(() => {
+      if (unsubscribed) return;
+      const local = getLocalLeaderboardPosts();
+      const map = new Map<string, LeaderboardPost>();
 
-    // Seed local
-    local.forEach(p => map.set(p.id, p));
-    // Merge Firebase
-    rawPosts.forEach(p => map.set(p.id, p));
+      // Seed local
+      local.forEach(p => map.set(p.id, p));
+      // Merge Firebase
+      rawPosts.forEach(p => map.set(p.id, p));
 
-    const combined = Array.from(map.values()).sort(
-      (a, b) => (b.createdAt || 0) - (a.createdAt || 0)
-    );
-    saveLocalLeaderboardPosts(combined);
-    callback(combined);
+      const combined = Array.from(map.values()).sort(
+        (a, b) => (b.createdAt || 0) - (a.createdAt || 0)
+      );
+      saveLocalLeaderboardPosts(combined);
+      callback(combined);
+    }, 40);
   };
 
   const initialLocal = getLocalLeaderboardPosts();
@@ -438,6 +449,7 @@ export function subscribeToAllLeaderboardPosts(
 
   return () => {
     unsubscribed = true;
+    if (timer) clearTimeout(timer);
     unsubA();
     unsubB();
   };

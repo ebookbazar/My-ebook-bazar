@@ -13,7 +13,7 @@ const toBanglaDigits = (num: number | null | undefined): string => {
   return num.toString().replace(/\d/g, (d) => bnDigits[parseInt(d, 10)]);
 };
 
-export const RealWebsiteStats: React.FC<RealWebsiteStatsProps> = ({
+export const RealWebsiteStats: React.FC<RealWebsiteStatsProps> = React.memo(({
   totalEbooks,
   totalUsers,
   totalSellers
@@ -77,4 +77,4 @@ export const RealWebsiteStats: React.FC<RealWebsiteStatsProps> = ({
       </div>
     </div>
   );
-};
+});

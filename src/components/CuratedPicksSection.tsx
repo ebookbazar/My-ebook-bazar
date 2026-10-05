@@ -12,7 +12,7 @@ interface CuratedPicksSectionProps {
   ratingSummaries?: Record<string, EbookRatingSummary>;
 }
 
-export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = ({
+export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = React.memo(({
   ebooks,
   onViewDetails,
   onBuyNow,
@@ -70,6 +70,9 @@ export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = ({
                   <img
                     src={book.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=400&auto=format&fit=crop'}
                     alt={book.title}
+                    width={112}
+                    height={150}
+                    decoding="async"
                     className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
                     loading="lazy"
                   />
@@ -164,4 +167,4 @@ export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = ({
       </div>
     </section>
   );
-};
+});

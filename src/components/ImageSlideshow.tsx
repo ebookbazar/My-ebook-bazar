@@ -146,8 +146,11 @@ export const ImageSlideshow: React.FC = () => {
                 <img
                   src={slide.src}
                   alt={slide.alt}
+                  width={1152}
+                  height={648}
                   referrerPolicy="no-referrer"
                   loading={idx === 0 ? 'eager' : 'lazy'}
+                  decoding={idx === 0 ? 'sync' : 'async'}
                   fetchPriority={idx === 0 ? 'high' : 'low'}
                   className={`w-full h-full object-cover object-center transform transition-transform duration-[7000ms] ease-out will-change-transform ${
                     isActive ? 'scale-[1.03]' : 'scale-100'

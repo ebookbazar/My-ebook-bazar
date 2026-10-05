@@ -21,7 +21,7 @@ interface FooterLinks {
   privacyUrl: string;
   contactUrl: string;
   aboutUrl: string;
-  facebookUrl?: string;
+  freederUrl?: string;
   youtubeUrl?: string;
   telegramUrl?: string;
 }
@@ -36,7 +36,7 @@ export const Footer: React.FC<FooterProps> = ({
     privacyUrl: '',
     contactUrl: 'https://wa.me/8801911633056',
     aboutUrl: '',
-    facebookUrl: 'https://www.facebook.com/mrashid016',
+    freederUrl: 'https://freeder.com.bd/pages/ebookbazar',
     youtubeUrl: 'https://youtube.com/@ebookbazarofficial?si=vosC0lffrhhckDLm',
     telegramUrl: 'https://t.me/ebookbazar'
   });
@@ -279,17 +279,17 @@ export const Footer: React.FC<FooterProps> = ({
 
             {/* 4 Circular Colorful Social Buttons from Reference Image */}
             <div className="flex items-center gap-3 pt-1">
-              {/* Facebook */}
+              {/* Freeder */}
               <a 
-                href={footerLinks.facebookUrl || "https://www.facebook.com/mrashid016"} 
+                href={footerLinks.freederUrl || "https://freeder.com.bd/pages/ebookbazar"} 
                 target="_blank" 
                 rel="noopener noreferrer"
-                className="w-10 h-10 rounded-full bg-[#1877F2] hover:bg-[#0d65d9] text-white flex items-center justify-center transition-transform hover:scale-110 shadow-md"
-                title="Facebook পেজ"
-                aria-label="Facebook"
+                className="w-10 h-10 rounded-full bg-[#059669] hover:bg-[#047857] text-white flex items-center justify-center transition-transform hover:scale-110 shadow-md border border-emerald-400/40"
+                title="Freeder"
+                aria-label="Freeder"
               >
-                <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24">
-                  <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
+                <svg className="w-5 h-5 fill-white" viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M6 3h12c.55 0 1 .45 1 1v2.5c0 .55-.45 1-1 1h-7v2.5h6c.55 0 1 .45 1 1V13c0 .55-.45 1-1 1h-6v6c0 .55-.45 1-1 1H7c-.55 0-1-.45-1-1V4c0-.55.45-1 1-1z"/>
                 </svg>
               </a>
 

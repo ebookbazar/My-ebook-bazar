@@ -262,7 +262,7 @@ export const SellerDashboard: React.FC<SellerDashboardProps> = ({
           setMinWithdraw(Number(data.minWithdraw));
         }
       }
-    });
+    }, () => {});
 
     // Load Support Tickets unread replies count for this seller
     const ticketsRef = ref(db, 'supportTickets');

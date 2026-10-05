@@ -233,7 +233,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   });
 
   const [socialLinks, setSocialLinks] = useState({
-    facebookUrl: 'https://www.facebook.com/mrashid016',
+    freederUrl: 'https://freeder.com.bd/pages/ebookbazar',
     youtubeUrl: 'https://youtube.com/@ebookbazarofficial?si=vosC0lffrhhckDLm'
   });
 
@@ -398,10 +398,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         if (active && snap.exists()) setSellers(snap.val() || {});
       }).catch(() => {});
 
-      get(ref(db, 'ebooks')).then(snap => {
-        if (active && snap.exists()) setEbooks(snap.val() || {});
-      }).catch(() => {});
-
       // 2. Realtime listeners with safe error handlers
       const unsubOrders = onValue(
         ref(db, 'orders'),
@@ -534,7 +530,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       };
 
       const unsubAppDownload0 = onValue(ref(db, 'ebooks/_appDownload'), handleDownloadSnap, () => {});
-      const unsubAppDownload1 = onValue(ref(db, 'appDownload'), handleDownloadSnap, () => {});
       const unsubAppDownload2 = onValue(ref(db, 'settings/appDownload'), (snap) => {
         if (snap.exists()) handleDownloadSnap(snap);
       }, () => {});
@@ -562,7 +557,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         unsubAffTxs();
         unsubAppDownloadPlatform();
         unsubAppDownload0();
-        unsubAppDownload1();
         unsubAppDownload2();
         unsubAppDownloadStats();
       };
@@ -3751,12 +3745,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   <h4 className="font-black text-slate-800 text-xs">অফিসিয়াল সোশ্যাল ও পেজ লিংক (নীতি ও পেজসমূহ):</h4>
                   <div className="space-y-3">
                     <div>
-                      <label className="block font-bold text-slate-700 mb-1">Facebook Page URL</label>
+                      <label className="block font-bold text-slate-700 mb-1">Freeder Page URL</label>
                       <input
                         type="url"
-                        value={socialLinks.facebookUrl}
-                        onChange={(e) => setSocialLinks({ ...socialLinks, facebookUrl: e.target.value })}
-                        placeholder="https://www.facebook.com/..."
+                        value={socialLinks.freederUrl || ''}
+                        onChange={(e) => setSocialLinks({ ...socialLinks, freederUrl: e.target.value })}
+                        placeholder="https://freeder.com.bd/pages/ebookbazar"
                         className="w-full p-2.5 rounded-xl border border-slate-300 text-xs font-mono"
                       />
                     </div>

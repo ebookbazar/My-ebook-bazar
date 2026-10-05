@@ -28,7 +28,7 @@ import {
   Home
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { db, ref, onValue, push, set, update } from '../firebase';
+import { db, ref, onValue, push, set, update, get } from '../firebase';
 import { Ebook, Order, WithdrawalRequest, NotificationItem, AffiliateTransaction } from '../types';
 import { INITIAL_EBOOKS } from '../data/initialEbooks';
 import { SupportTicketSection } from './SupportTicketSection';
@@ -159,15 +159,12 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
 
         // Also fetch from ebooks node to get latest real-time updates
         const promises = bookIds.map((bid) => {
-          return new Promise<void>((resolve) => {
-            onValue(ref(db, `ebooks/${bid}`), (bSnap) => {
-              if (bSnap.exists()) {
-                const existing = booksMap.get(bid);
-                booksMap.set(bid, { ...existing, ...bSnap.val(), id: bid });
-              }
-              resolve();
-            }, { onlyOnce: true });
-          });
+          return get(ref(db, `ebooks/${bid}`)).then((bSnap) => {
+            if (bSnap.exists()) {
+              const existing = booksMap.get(bid);
+              booksMap.set(bid, { ...existing, ...bSnap.val(), id: bid });
+            }
+          }).catch(() => {});
         });
 
         Promise.all(promises).then(() => {
@@ -298,7 +295,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
       } else {
         setReferredUsers([]);
       }
-    });
+    }, () => {});
 
     // Load Support Tickets unread replies count
     const unsubTickets = onValue(ref(db, 'supportTickets'), (snap) => {

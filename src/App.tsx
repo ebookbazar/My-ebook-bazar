@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, Suspense, lazy } from 'react';
 import { 
   Search, 
   Filter, 
@@ -28,29 +28,40 @@ import { Footer } from './components/Footer';
 import { EbookCard } from './components/EbookCard';
 import { EbookDetailModal } from './components/EbookDetailModal';
 import { CartModal } from './components/CartModal';
-import { CheckoutView } from './components/CheckoutView';
-import { UserDashboard } from './components/UserDashboard';
-import { SellerDashboard } from './components/SellerDashboard';
-import { AdminPanel } from './components/AdminPanel';
 import { AuthModal } from './components/AuthModal';
-import { PdfReaderModal } from './components/PdfReaderModal';
 import { BlogModal } from './components/BlogModal';
-import { TermsConditionsModal, PrivacyPolicyModal } from './components/LegalModals';
-import { MembershipView } from './components/MembershipView';
-import { JobServicesView } from './components/JobServicesView';
-import { AllFeaturesView } from './components/AllFeaturesView';
-import { AboutView } from './components/AboutView';
-import { TermsView } from './components/TermsView';
 import { ImageSlideshow } from './components/ImageSlideshow';
 import { HomeFeatureCards } from './components/HomeFeatureCards';
-import { BlogView } from './components/BlogView';
-import { AdminBlogManagerModal } from './components/AdminBlogManagerModal';
 import { RealWebsiteStats } from './components/RealWebsiteStats';
 import { CuratedPicksSection } from './components/CuratedPicksSection';
 import { LeaderboardSection } from './components/LeaderboardSection';
 import { FloatingSearch } from './components/FloatingSearch';
 import { LiveChatWidget } from './components/LiveChatWidget';
 import { AppDownloadBanner } from './components/AppDownloadBanner';
+
+// Dynamic lazy-loaded views & heavy modals for lightning-fast initial page load
+const CheckoutView = lazy(() => import('./components/CheckoutView').then(m => ({ default: m.CheckoutView })));
+const UserDashboard = lazy(() => import('./components/UserDashboard').then(m => ({ default: m.UserDashboard })));
+const SellerDashboard = lazy(() => import('./components/SellerDashboard').then(m => ({ default: m.SellerDashboard })));
+const AdminPanel = lazy(() => import('./components/AdminPanel').then(m => ({ default: m.AdminPanel })));
+const PdfReaderModal = lazy(() => import('./components/PdfReaderModal').then(m => ({ default: m.PdfReaderModal })));
+const TermsConditionsModal = lazy(() => import('./components/LegalModals').then(m => ({ default: m.TermsConditionsModal })));
+const PrivacyPolicyModal = lazy(() => import('./components/LegalModals').then(m => ({ default: m.PrivacyPolicyModal })));
+const MembershipView = lazy(() => import('./components/MembershipView').then(m => ({ default: m.MembershipView })));
+const JobServicesView = lazy(() => import('./components/JobServicesView').then(m => ({ default: m.JobServicesView })));
+const AllFeaturesView = lazy(() => import('./components/AllFeaturesView').then(m => ({ default: m.AllFeaturesView })));
+const AboutView = lazy(() => import('./components/AboutView').then(m => ({ default: m.AboutView })));
+const TermsView = lazy(() => import('./components/TermsView').then(m => ({ default: m.TermsView })));
+const BlogView = lazy(() => import('./components/BlogView').then(m => ({ default: m.BlogView })));
+const AdminBlogManagerModal = lazy(() => import('./components/AdminBlogManagerModal').then(m => ({ default: m.AdminBlogManagerModal })));
+
+// Lightweight smooth loader for lazy views
+const ViewLoadingFallback: React.FC = () => (
+  <div className="flex flex-col items-center justify-center min-h-[300px] p-8 space-y-3">
+    <div className="w-9 h-9 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin"></div>
+    <p className="text-xs font-bold text-slate-500 animate-pulse">লোড হচ্ছে...</p>
+  </div>
+);
 import { 
   extractBloggerPostsFromDOM, 
   fetchBloggerFeedPosts, 
@@ -172,34 +183,38 @@ function MainApp() {
       }
     });
 
-    // 2. Direct listeners when authenticated (automatically syncs latest counts to _platformStats)
-    const usersRef = ref(db, 'users');
-    const unsubUsers = onValue(usersRef, (snap) => {
-      if (snap.exists()) {
-        const count = Object.keys(snap.val() || {}).length;
-        setTotalUsersCount(count);
-        try {
-          update(ref(db, 'ebooks/_platformStats'), { totalUsers: count, updatedAt: Date.now() }).catch(() => {});
-        } catch {
-          // ignore
+    // 2. Direct listeners when authenticated as Admin (syncs latest counts to _platformStats)
+    let unsubUsers = () => {};
+    let unsubSellers = () => {};
+    if (isAdmin) {
+      const usersRef = ref(db, 'users');
+      unsubUsers = onValue(usersRef, (snap) => {
+        if (snap.exists()) {
+          const count = Object.keys(snap.val() || {}).length;
+          setTotalUsersCount(count);
+          try {
+            update(ref(db, 'ebooks/_platformStats'), { totalUsers: count, updatedAt: Date.now() }).catch(() => {});
+          } catch {
+            // ignore
+          }
         }
-      }
-    }, () => {});
+      }, () => {});
 
-    const sellersRef = ref(db, 'sellers');
-    const unsubSellers = onValue(sellersRef, (snap) => {
-      if (snap.exists()) {
-        const count = Object.keys(snap.val() || {}).length;
-        setTotalSellersCount(count);
-        try {
-          update(ref(db, 'ebooks/_platformStats'), { totalSellers: count, updatedAt: Date.now() }).catch(() => {});
-        } catch {
-          // ignore
+      const sellersRef = ref(db, 'sellers');
+      unsubSellers = onValue(sellersRef, (snap) => {
+        if (snap.exists()) {
+          const count = Object.keys(snap.val() || {}).length;
+          setTotalSellersCount(count);
+          try {
+            update(ref(db, 'ebooks/_platformStats'), { totalSellers: count, updatedAt: Date.now() }).catch(() => {});
+          } catch {
+            // ignore
+          }
         }
-      }
-    }, () => {});
+      }, () => {});
+    }
 
-    // Listen to App Download Settings from Realtime Database (Checks both 'appDownload' and 'settings/appDownload')
+    // Listen to App Download Settings from Realtime Database (Optimized single-stream listener)
     const handleDownloadSnap = (snap: any) => {
       if (snap.exists()) {
         const val = snap.val();
@@ -233,7 +248,6 @@ function MainApp() {
     };
 
     const unsubAppDownload0 = onValue(ref(db, 'ebooks/_appDownload'), handleDownloadSnap, () => {});
-    const unsubAppDownload1 = onValue(ref(db, 'appDownload'), handleDownloadSnap, () => {});
     const unsubAppDownload2 = onValue(ref(db, 'settings/appDownload'), (snap) => {
       if (snap.exists()) handleDownloadSnap(snap);
     }, () => {});
@@ -243,10 +257,9 @@ function MainApp() {
       unsubUsers();
       unsubSellers();
       unsubAppDownload0();
-      unsubAppDownload1();
       unsubAppDownload2();
     };
-  }, []);
+  }, [isAdmin]);
   
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -1005,34 +1018,36 @@ function MainApp() {
 
         {/* VIEW 2: BLOG */}
         {currentView === 'blog' && (
-          <BlogView
-            posts={displayedBlogPosts}
-            allEbooks={ebooks}
-            activePost={selectedBlogPost}
-            setActivePost={handleSetSelectedBlogPost}
-            onNavigateHome={handleNavigateHomeFromBlog}
-            onSelectEbook={(b) => {
-              setSelectedEbook(b);
-              setCurrentView('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            isAdmin={currentUser?.email === 'suma47083@gmail.com' || userProfile?.role === 'admin' || currentUser?.email === 'admin@ebookbazar.com' || currentUser?.email === 'redx0187@gmail.com'}
-            notFoundSlug={blogNotFoundSlug}
-            onClearNotFound={() => {
-              setBlogNotFoundSlug(null);
-              if (typeof window !== 'undefined') {
-                window.history.pushState({}, '', '/blog');
-              }
-            }}
-            onDeleteDemo={async () => {
-              if (window.confirm('আপনি কি নিশ্চিত যে সকল ডেমো ব্লগ পোস্ট ডিলিট করতে চান? এরপর শুধু আপনার তৈরি বাস্তব পোস্ট প্রদর্শিত হবে।')) {
-                await setHideDemoBlogsSetting(true);
-                setHideDemoBlogs(true);
-                alert('সকল ডেমো পোস্ট সফলভাবে ডিলিট ও লুকানো হয়েছে!');
-              }
-            }}
-            onOpenAdminBlogManager={() => setIsAdminBlogManagerOpen(true)}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <BlogView
+              posts={displayedBlogPosts}
+              allEbooks={ebooks}
+              activePost={selectedBlogPost}
+              setActivePost={handleSetSelectedBlogPost}
+              onNavigateHome={handleNavigateHomeFromBlog}
+              onSelectEbook={(b) => {
+                setSelectedEbook(b);
+                setCurrentView('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              isAdmin={currentUser?.email === 'suma47083@gmail.com' || userProfile?.role === 'admin' || currentUser?.email === 'admin@ebookbazar.com' || currentUser?.email === 'redx0187@gmail.com'}
+              notFoundSlug={blogNotFoundSlug}
+              onClearNotFound={() => {
+                setBlogNotFoundSlug(null);
+                if (typeof window !== 'undefined') {
+                  window.history.pushState({}, '', '/blog');
+                }
+              }}
+              onDeleteDemo={async () => {
+                if (window.confirm('আপনি কি নিশ্চিত যে সকল ডেমো ব্লগ পোস্ট ডিলিট করতে চান? এরপর শুধু আপনার তৈরি বাস্তব পোস্ট প্রদর্শিত হবে।')) {
+                  await setHideDemoBlogsSetting(true);
+                  setHideDemoBlogs(true);
+                  alert('সকল ডেমো পোস্ট সফলভাবে ডিলিট ও লুকানো হয়েছে!');
+                }
+              }}
+              onOpenAdminBlogManager={() => setIsAdminBlogManagerOpen(true)}
+            />
+          </Suspense>
         )}
 
         {/* VIEW 3: AFFILIATE */}
@@ -1225,44 +1240,50 @@ function MainApp() {
 
         {/* VIEW: ABOUT */}
         {currentView === 'about' && (
-          <AboutView
-            onNavigateHome={() => {
-              setCurrentView('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onNavigateAffiliate={() => {
-              setCurrentView('affiliate');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onNavigateMembership={() => {
-              setCurrentView('membership');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <AboutView
+              onNavigateHome={() => {
+                setCurrentView('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateAffiliate={() => {
+                setCurrentView('affiliate');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateMembership={() => {
+                setCurrentView('membership');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          </Suspense>
         )}
 
         {/* VIEW: TERMS & CONDITIONS */}
         {currentView === 'terms' && (
-          <TermsView
-            onNavigateHome={() => {
-              setCurrentView('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <TermsView
+              onNavigateHome={() => {
+                setCurrentView('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          </Suspense>
         )}
 
         {/* VIEW 5: JOB & SERVICES */}
         {currentView === 'job' && (
-          <JobServicesView
-            onNavigateAffiliate={() => {
-              setCurrentView('affiliate');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-            onNavigateHome={() => {
-              setCurrentView('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <JobServicesView
+              onNavigateAffiliate={() => {
+                setCurrentView('affiliate');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onNavigateHome={() => {
+                setCurrentView('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          </Suspense>
         )}
 
         {/* VIEW 6: OFFER */}
@@ -1302,54 +1323,64 @@ function MainApp() {
 
         {/* VIEW 7: CHECKOUT */}
         {currentView === 'checkout' && (
-          <CheckoutView
-            directItem={directCheckoutItem}
-            onBack={() => setCurrentView('home')}
-            onSuccess={() => {
-              setDirectCheckoutItem(null);
-              setCurrentView('user-dashboard');
-            }}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <CheckoutView
+              directItem={directCheckoutItem}
+              onBack={() => setCurrentView('home')}
+              onSuccess={() => {
+                setDirectCheckoutItem(null);
+                setCurrentView('user-dashboard');
+              }}
+            />
+          </Suspense>
         )}
 
         {/* VIEW 8: USER DASHBOARD */}
         {currentView === 'user-dashboard' && (
-          <UserDashboard
-            onOpenReader={handleOpenPdfReader}
-            onNavigateHome={() => setCurrentView('home')}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <UserDashboard
+              onOpenReader={handleOpenPdfReader}
+              onNavigateHome={() => setCurrentView('home')}
+            />
+          </Suspense>
         )}
 
         {/* VIEW 9: SELLER DASHBOARD */}
         {currentView === 'seller-dashboard' && (
-          <SellerDashboard
-            onOpenReader={handleOpenPdfReader}
-            ratingSummaries={ratingSummaries}
-            onNavigateHome={() => {
-              setCurrentView('home');
-              window.scrollTo({ top: 0, behavior: 'smooth' });
-            }}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <SellerDashboard
+              onOpenReader={handleOpenPdfReader}
+              ratingSummaries={ratingSummaries}
+              onNavigateHome={() => {
+                setCurrentView('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+            />
+          </Suspense>
         )}
 
         {/* VIEW 10: MEMBERSHIP DETAILS */}
         {currentView === 'membership' && (
-          <MembershipView
-            onNavigateHome={() => setCurrentView('home')}
-            onOpenSellerDashboard={() => setCurrentView('seller-dashboard')}
-            onOpenAuth={(mode) => {
-              setAuthInitialMode(mode);
-              setIsAuthOpen(true);
-            }}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <MembershipView
+              onNavigateHome={() => setCurrentView('home')}
+              onOpenSellerDashboard={() => setCurrentView('seller-dashboard')}
+              onOpenAuth={(mode) => {
+                setAuthInitialMode(mode);
+                setIsAuthOpen(true);
+              }}
+            />
+          </Suspense>
         )}
 
         {/* VIEW 11: USER LIBRARY */}
         {currentView === 'library' && (
-          <UserDashboard
-            onOpenReader={handleOpenPdfReader}
-            onNavigateHome={() => setCurrentView('home')}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <UserDashboard
+              onOpenReader={handleOpenPdfReader}
+              onNavigateHome={() => setCurrentView('home')}
+            />
+          </Suspense>
         )}
 
         {/* VIEW 12: DEDICATED LOGIN / SIGNUP CARD */}
@@ -1406,14 +1437,16 @@ function MainApp() {
 
         {/* VIEW 13: ALL FEATURES HUB (ADMIN, SELLER, USER & PLATFORM) */}
         {currentView === 'all-features' && (
-          <AllFeaturesView
-            onOpenAdmin={() => setIsAdminOpen(true)}
-            onNavigateSeller={() => { setCurrentView('seller-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            onNavigateUser={() => { setCurrentView('user-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            onNavigateHome={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            onNavigateJob={() => { setCurrentView('job'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-            onNavigateMembership={() => { setCurrentView('membership'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-          />
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <AllFeaturesView
+              onOpenAdmin={() => setIsAdminOpen(true)}
+              onNavigateSeller={() => { setCurrentView('seller-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onNavigateUser={() => { setCurrentView('user-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onNavigateHome={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onNavigateJob={() => { setCurrentView('job'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onNavigateMembership={() => { setCurrentView('membership'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            />
+          </Suspense>
         )}
       </main>
 
@@ -1471,47 +1504,55 @@ function MainApp() {
 
       {/* MODAL 4: ADMIN PANEL */}
       {isAdminOpen && (
-        <AdminPanel
-          onClose={() => {
-            setIsAdminOpen(false);
-            setCurrentView('home');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          onNavigateHome={() => {
-            setIsAdminOpen(false);
-            setCurrentView('home');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-          onOpenReader={handleOpenPdfReader}
-          onOpenBlogManager={() => setIsAdminBlogManagerOpen(true)}
-          ratingSummaries={ratingSummaries}
-        />
+        <Suspense fallback={<ViewLoadingFallback />}>
+          <AdminPanel
+            onClose={() => {
+              setIsAdminOpen(false);
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onNavigateHome={() => {
+              setIsAdminOpen(false);
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+            onOpenReader={handleOpenPdfReader}
+            onOpenBlogManager={() => setIsAdminBlogManagerOpen(true)}
+            ratingSummaries={ratingSummaries}
+          />
+        </Suspense>
       )}
 
       {/* MODAL: ADMIN BLOG MANAGER & DEMO CLEANUP */}
-      <AdminBlogManagerModal
-        isOpen={isAdminBlogManagerOpen}
-        onClose={() => setIsAdminBlogManagerOpen(false)}
-        posts={blogPosts}
-        allEbooks={ebooks}
-        onRefresh={() => {
-          const localPosts = getLocalStoredBlogs();
-          const domPosts = extractBloggerPostsFromDOM();
-          const map = new Map<string, BlogPost>();
-          domPosts.forEach(p => map.set(p.id, p));
-          localPosts.forEach(p => map.set(p.id, p));
-          setBlogPosts(Array.from(map.values()));
-        }}
-        hideDemoBlogs={hideDemoBlogs}
-      />
+      {isAdminBlogManagerOpen && (
+        <Suspense fallback={null}>
+          <AdminBlogManagerModal
+            isOpen={isAdminBlogManagerOpen}
+            onClose={() => setIsAdminBlogManagerOpen(false)}
+            posts={blogPosts}
+            allEbooks={ebooks}
+            onRefresh={() => {
+              const localPosts = getLocalStoredBlogs();
+              const domPosts = extractBloggerPostsFromDOM();
+              const map = new Map<string, BlogPost>();
+              domPosts.forEach(p => map.set(p.id, p));
+              localPosts.forEach(p => map.set(p.id, p));
+              setBlogPosts(Array.from(map.values()));
+            }}
+            hideDemoBlogs={hideDemoBlogs}
+          />
+        </Suspense>
+      )}
 
       {/* MODAL 5: IN-APP PDF READER */}
       {readingPdf && (
-        <PdfReaderModal
-          url={readingPdf.url}
-          title={readingPdf.title}
-          onClose={() => setReadingPdf(null)}
-        />
+        <Suspense fallback={null}>
+          <PdfReaderModal
+            url={readingPdf.url}
+            title={readingPdf.title}
+            onClose={() => setReadingPdf(null)}
+          />
+        </Suspense>
       )}
 
       {/* MODAL 6: BLOG FULL ARTICLE READER (Quick modal fallback if viewed outside dedicated blog page) */}
@@ -1528,22 +1569,30 @@ function MainApp() {
       )}
 
       {/* MODAL 7: TERMS & CONDITIONS */}
-      <TermsConditionsModal
-        isOpen={isTermsOpen || currentView === 'terms'}
-        onClose={() => {
-          setIsTermsOpen(false);
-          if (currentView === 'terms') setCurrentView('home');
-        }}
-      />
+      {(isTermsOpen || currentView === 'terms') && (
+        <Suspense fallback={null}>
+          <TermsConditionsModal
+            isOpen={isTermsOpen || currentView === 'terms'}
+            onClose={() => {
+              setIsTermsOpen(false);
+              if (currentView === 'terms') setCurrentView('home');
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* MODAL 8: PRIVACY POLICY */}
-      <PrivacyPolicyModal
-        isOpen={isPrivacyOpen || currentView === 'privacy'}
-        onClose={() => {
-          setIsPrivacyOpen(false);
-          if (currentView === 'privacy') setCurrentView('home');
-        }}
-      />
+      {(isPrivacyOpen || currentView === 'privacy') && (
+        <Suspense fallback={null}>
+          <PrivacyPolicyModal
+            isOpen={isPrivacyOpen || currentView === 'privacy'}
+            onClose={() => {
+              setIsPrivacyOpen(false);
+              if (currentView === 'privacy') setCurrentView('home');
+            }}
+          />
+        </Suspense>
+      )}
     </div>
   );
 }

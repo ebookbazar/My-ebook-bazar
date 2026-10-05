@@ -36,7 +36,7 @@ interface GlassCardItem {
   render3DIcon: () => React.ReactNode;
 }
 
-export const HomeFeatureCards: React.FC<HomeFeatureCardsProps> = ({
+export const HomeFeatureCards: React.FC<HomeFeatureCardsProps> = React.memo(({
   currentView,
   setCurrentView,
 }) => {
@@ -486,4 +486,4 @@ export const HomeFeatureCards: React.FC<HomeFeatureCardsProps> = ({
       </div>
     </section>
   );
-};
+});

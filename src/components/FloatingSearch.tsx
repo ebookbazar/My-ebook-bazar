@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Search, X, BookOpen, FileText, ArrowRight, Sparkles } from 'lucide-react';
 import { Ebook, BlogPost } from '../types';
 
@@ -42,25 +42,27 @@ export const FloatingSearch: React.FC<FloatingSearchProps> = ({
 
   const cleanQ = query.trim().toLowerCase();
 
-  const matchingEbooks = cleanQ
-    ? (ebooks || [])
-        .filter(b => 
-          (b.title || '').toLowerCase().includes(cleanQ) ||
-          (b.author || '').toLowerCase().includes(cleanQ) ||
-          (b.category || '').toLowerCase().includes(cleanQ)
-        )
-        .slice(0, 5)
-    : [];
+  const matchingEbooks = useMemo(() => {
+    if (!cleanQ) return [];
+    return (ebooks || [])
+      .filter(b => 
+        (b.title || '').toLowerCase().includes(cleanQ) ||
+        (b.author || '').toLowerCase().includes(cleanQ) ||
+        (b.category || '').toLowerCase().includes(cleanQ)
+      )
+      .slice(0, 5);
+  }, [cleanQ, ebooks]);
 
-  const matchingBlogs = cleanQ
-    ? (blogPosts || [])
-        .filter(p => 
-          (p.title || '').toLowerCase().includes(cleanQ) ||
-          (p.category || '').toLowerCase().includes(cleanQ) ||
-          (p.excerpt || '').toLowerCase().includes(cleanQ)
-        )
-        .slice(0, 4)
-    : [];
+  const matchingBlogs = useMemo(() => {
+    if (!cleanQ) return [];
+    return (blogPosts || [])
+      .filter(p => 
+        (p.title || '').toLowerCase().includes(cleanQ) ||
+        (p.category || '').toLowerCase().includes(cleanQ) ||
+        (p.excerpt || '').toLowerCase().includes(cleanQ)
+      )
+      .slice(0, 4);
+  }, [cleanQ, blogPosts]);
 
   const hasResults = matchingEbooks.length > 0 || matchingBlogs.length > 0;
 
