@@ -7,30 +7,35 @@ export interface SlideItem {
   alt: string;
 }
 
+const getSlideSrc = (filename: string) => {
+  const base = import.meta.env.BASE_URL || '/';
+  return `${base.replace(/\/$/, '')}/${filename}`;
+};
+
 const SLIDES: SlideItem[] = [
   {
     id: 1,
-    src: '/slide-1.webp',
+    src: getSlideSrc('slide-1.webp'),
     alt: 'শৈশবে ফিরে যাওয়া — গ্রামের বর্ষায় উঠানে বৃষ্টির পানিতে শিশুর আনন্দ ও হারিকেনের আলোয় শান্ত পড়াশোনা'
   },
   {
     id: 2,
-    src: '/slide-2.webp',
+    src: getSlideSrc('slide-2.webp'),
     alt: 'শীতের সকালে মায়ের ডাক — শীতের কুয়াশায় পিঠার সুবাস ও গ্রামের উঠানের শৈশবের স্মৃতি'
   },
   {
     id: 3,
-    src: '/slide-3.webp',
+    src: getSlideSrc('slide-3.webp'),
     alt: 'গ্রামের পাকা ব্রিজে বন্ধুদের আড্ডা — চায়ের কাপে গল্প, মাঠে ফুটবল ও সোনালী বিকেল'
   },
   {
     id: 4,
-    src: '/slide-4.webp',
+    src: getSlideSrc('slide-4.webp'),
     alt: 'একটি চিঠি বদলে দিতে পারে একটি পরিবার — অপেক্ষার শেষে সুখবর ও পারিবারিক আনন্দ'
   },
   {
     id: 5,
-    src: '/slide-5.webp',
+    src: getSlideSrc('slide-5.webp'),
     alt: 'গ্রাম থেকেই শুরু হোক স্বপ্নের ব্যবসা — অনলাইনে ব্যবসা ও নারীদের স্বাবলম্বী হওয়ার আনন্দ'
   }
 ];

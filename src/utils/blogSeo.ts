@@ -639,8 +639,9 @@ export function getPublicBlogUrl(slugOrId?: string): string {
   const origin = typeof window !== 'undefined' && window.location.origin 
     ? window.location.origin 
     : '';
-  if (!slugOrId) return `${origin}/blog`;
-  return `${origin}/blog/${slugOrId}`;
+  const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+  if (!slugOrId) return `${origin}${basePath}/blog`;
+  return `${origin}${basePath}/blog/${slugOrId}`;
 }
 
 /**

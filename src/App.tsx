@@ -427,10 +427,19 @@ function MainApp() {
   }, [blogPosts, hideDemoBlogs]);
 
   // Synchronize URL routing for /blog and /blog/:slug with HTML5 history and popstate
+  const getAppBaseUrl = () => (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+
   useEffect(() => {
     const handleUrlRoute = () => {
       if (typeof window === 'undefined') return;
-      const pathname = window.location.pathname;
+      const basePath = getAppBaseUrl();
+      let pathname = window.location.pathname;
+      if (basePath && pathname.startsWith(basePath)) {
+        pathname = pathname.slice(basePath.length);
+      }
+      if (!pathname.startsWith('/')) {
+        pathname = '/' + pathname;
+      }
 
       if (pathname.startsWith('/blog/') || pathname === '/blog') {
         setCurrentView('blog');
@@ -459,7 +468,7 @@ function MainApp() {
           setSelectedBlogPost(null);
           setBlogNotFoundSlug(null);
         }
-      } else if (pathname === '/' || pathname === '/home') {
+      } else if (pathname === '/' || pathname === '/home' || pathname === '') {
         // Only reset if currently on blog view
         setSelectedBlogPost(null);
         setBlogNotFoundSlug(null);
@@ -478,7 +487,7 @@ function MainApp() {
     setCurrentView('blog');
     const slug = post.slug || post.id;
     if (typeof window !== 'undefined') {
-      const targetUrl = `/blog/${slug}`;
+      const targetUrl = `${getAppBaseUrl()}/blog/${slug}`;
       if (window.location.pathname !== targetUrl) {
         window.history.pushState({ blogSlug: slug }, '', targetUrl);
       }
@@ -490,15 +499,16 @@ function MainApp() {
     setSelectedBlogPost(post);
     setBlogNotFoundSlug(null);
     if (typeof window !== 'undefined') {
+      const base = getAppBaseUrl();
       if (post) {
         const slug = post.slug || post.id;
-        const targetUrl = `/blog/${slug}`;
+        const targetUrl = `${base}/blog/${slug}`;
         if (window.location.pathname !== targetUrl) {
           window.history.pushState({ blogSlug: slug }, '', targetUrl);
         }
       } else {
-        if (window.location.pathname.startsWith('/blog/')) {
-          window.history.pushState({}, '', '/blog');
+        if (window.location.pathname.includes('/blog/')) {
+          window.history.pushState({}, '', `${base}/blog`);
         }
       }
     }
@@ -508,8 +518,9 @@ function MainApp() {
     setSelectedBlogPost(null);
     setBlogNotFoundSlug(null);
     setCurrentView('home');
-    if (typeof window !== 'undefined' && window.location.pathname.startsWith('/blog')) {
-      window.history.pushState({}, '', '/');
+    if (typeof window !== 'undefined' && window.location.pathname.includes('/blog')) {
+      const homeUrl = getAppBaseUrl() + '/' || '/';
+      window.history.pushState({}, '', homeUrl);
     }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
@@ -895,8 +906,11 @@ function MainApp() {
                     setCurrentView('blog');
                     setSelectedBlogPost(null);
                     setBlogNotFoundSlug(null);
-                    if (typeof window !== 'undefined' && window.location.pathname !== '/blog') {
-                      window.history.pushState({}, '', '/blog');
+                    if (typeof window !== 'undefined') {
+                      const blogUrl = `${getAppBaseUrl()}/blog`;
+                      if (window.location.pathname !== blogUrl) {
+                        window.history.pushState({}, '', blogUrl);
+                      }
                     }
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
@@ -1105,11 +1119,11 @@ function MainApp() {
                   {/* Shareable Link Box */}
                   <div className="pt-2 border-t border-white/10 flex items-center justify-between gap-2 text-xs">
                     <span className="text-[11px] text-slate-300 truncate font-mono">
-                      {window.location.origin}/?ref={userProfile.referralCode}
+                      {window.location.origin}{getAppBaseUrl()}/?ref={userProfile.referralCode}
                     </span>
                     <button
                       onClick={() => {
-                        const link = `${window.location.origin}/?ref=${userProfile.referralCode}`;
+                        const link = `${window.location.origin}${getAppBaseUrl()}/?ref=${userProfile.referralCode}`;
                         navigator.clipboard.writeText(link);
                         setCopiedRef(true);
                         setTimeout(() => setCopiedRef(false), 2000);

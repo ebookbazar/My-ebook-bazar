@@ -56,10 +56,11 @@ export const BlogView: React.FC<BlogViewProps> = ({
 
   // Dynamic SEO Hook: Injects Title, Meta Description, Canonical, OG, Twitter & JSON-LD
   useEffect(() => {
+    const basePath = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
     if (activePost) {
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ebookbazar.com';
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://suma47083-maker.github.io/My-ebook-bazar';
       const postSlug = activePost.slug || activePost.id;
-      const postCanonical = activePost.canonicalUrl || `${origin}/blog/${postSlug}`;
+      const postCanonical = activePost.canonicalUrl || `${origin}${basePath}/blog/${postSlug}`;
       const isAllowedIndex = activePost.status !== 'DRAFT' && activePost.allowIndex !== false;
 
       updateDocumentSeo({
@@ -77,11 +78,11 @@ export const BlogView: React.FC<BlogViewProps> = ({
         allowIndex: isAllowedIndex
       });
     } else {
-      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ebookbazar.com';
+      const origin = typeof window !== 'undefined' ? window.location.origin : 'https://suma47083-maker.github.io/My-ebook-bazar';
       updateDocumentSeo({
         title: 'ডিজিটাল স্কিল, ক্যারিয়ার ও ই-বুক পাবলিশিং ব্লগ',
         description: 'অনলাইন স্কিল ডেভেলপমেন্ট, ফ্রিল্যান্সিং ক্যারিয়ার, ই-বুক প্রকাশনা এবং আধুনিক প্রযুক্তির বাস্তবসম্মত নির্দেশিকা।',
-        canonicalUrl: `${origin}/blog`,
+        canonicalUrl: `${origin}${basePath}/blog`,
         type: 'website',
         allowIndex: true
       });

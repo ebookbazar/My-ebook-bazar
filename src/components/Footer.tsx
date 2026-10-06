@@ -96,7 +96,7 @@ export const Footer: React.FC<FooterProps> = ({
               {/* Official eBookBazar Golden Crest Logo */}
               <div className="relative w-12 h-12 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-500 shadow-md group-hover:scale-105 transition-transform duration-200 shrink-0">
                 <img 
-                  src="/ebookbazar-logo.jpg" 
+                  src={`${import.meta.env.BASE_URL || '/'}ebookbazar-logo.jpg`} 
                   alt="eBookBazar Official Logo" 
                   className="w-full h-full rounded-full object-cover"
                   referrerPolicy="no-referrer"

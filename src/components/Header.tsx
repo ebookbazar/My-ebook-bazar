@@ -103,7 +103,7 @@ export const Header: React.FC<HeaderProps> = ({
             {/* Official Logo with Golden Crest */}
             <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-500 shadow-md group-hover:scale-105 transition-transform duration-200 shrink-0">
               <img 
-                src="/ebookbazar-logo.jpg" 
+                src={`${import.meta.env.BASE_URL || '/'}ebookbazar-logo.jpg`} 
                 alt="eBookBazar Official Logo" 
                 className="w-full h-full rounded-full object-cover"
                 referrerPolicy="no-referrer"

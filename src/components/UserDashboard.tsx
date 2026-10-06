@@ -590,7 +590,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                 type="button"
                 onClick={() => {
                   if (!userProfile?.referralCode) return;
-                  const link = `${window.location.origin}/?ref=${userProfile.referralCode}`;
+                  const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+                  const link = `${window.location.origin}${base}/?ref=${userProfile.referralCode}`;
                   navigator.clipboard.writeText(link);
                   setCopiedLink(true);
                   setTimeout(() => setCopiedLink(false), 2000);
@@ -1286,7 +1287,8 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                   type="button"
                   onClick={() => {
                     if (!userProfile?.referralCode) return;
-                    const link = `${window.location.origin}/?ref=${userProfile.referralCode}`;
+                    const base = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+                    const link = `${window.location.origin}${base}/?ref=${userProfile.referralCode}`;
                     navigator.clipboard.writeText(link);
                     setCopiedLink(true);
                     setTimeout(() => setCopiedLink(false), 2000);
