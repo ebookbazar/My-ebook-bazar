@@ -106,6 +106,9 @@ export const Header: React.FC<HeaderProps> = ({
               <img 
                 src={`${import.meta.env.BASE_URL || '/'}ebookbazar-logo.jpg`} 
                 alt="eBookBazar Official Logo" 
+                width={44}
+                height={44}
+                decoding="async"
                 className="w-full h-full rounded-full object-cover"
                 referrerPolicy="no-referrer"
                 onError={(e) => {

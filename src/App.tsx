@@ -26,20 +26,20 @@ import { CartProvider, useCart } from './context/CartContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { EbookCard } from './components/EbookCard';
-import { EbookDetailModal } from './components/EbookDetailModal';
-import { CartModal } from './components/CartModal';
-import { AuthModal } from './components/AuthModal';
-import { BlogModal } from './components/BlogModal';
 import { ImageSlideshow } from './components/ImageSlideshow';
 import { HomeFeatureCards } from './components/HomeFeatureCards';
 import { RealWebsiteStats } from './components/RealWebsiteStats';
 import { CuratedPicksSection } from './components/CuratedPicksSection';
 import { LeaderboardSection } from './components/LeaderboardSection';
-import { FloatingSearch } from './components/FloatingSearch';
-import { LiveChatWidget } from './components/LiveChatWidget';
 import { AppDownloadBanner } from './components/AppDownloadBanner';
 
-// Dynamic lazy-loaded views & heavy modals for lightning-fast initial page load
+// Dynamic lazy-loaded views, widgets & heavy modals for lightning-fast initial page load
+const EbookDetailModal = lazy(() => import('./components/EbookDetailModal').then(m => ({ default: m.EbookDetailModal })));
+const CartModal = lazy(() => import('./components/CartModal').then(m => ({ default: m.CartModal })));
+const AuthModal = lazy(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })));
+const BlogModal = lazy(() => import('./components/BlogModal').then(m => ({ default: m.BlogModal })));
+const FloatingSearch = lazy(() => import('./components/FloatingSearch').then(m => ({ default: m.FloatingSearch })));
+const LiveChatWidget = lazy(() => import('./components/LiveChatWidget').then(m => ({ default: m.LiveChatWidget })));
 const CheckoutView = lazy(() => import('./components/CheckoutView').then(m => ({ default: m.CheckoutView })));
 const UserDashboard = lazy(() => import('./components/UserDashboard').then(m => ({ default: m.UserDashboard })));
 const SellerDashboard = lazy(() => import('./components/SellerDashboard').then(m => ({ default: m.SellerDashboard })));
@@ -181,12 +181,18 @@ function MainApp() {
     getLocalRatingSummaries()
   );
 
-  // Subscribe to realtime rating summaries
+  // Subscribe to realtime rating summaries (deferred slightly to prioritize FCP/LCP)
   useEffect(() => {
-    const unsubRatings = subscribeToAllRatingSummaries((summaries) => {
-      setRatingSummaries(summaries);
-    });
-    return () => unsubRatings();
+    let unsubRatings = () => {};
+    const timer = setTimeout(() => {
+      unsubRatings = subscribeToAllRatingSummaries((summaries) => {
+        setRatingSummaries(summaries);
+      });
+    }, 350);
+    return () => {
+      clearTimeout(timer);
+      unsubRatings();
+    };
   }, []);
 
   // Real Website Stats from Firebase RTDB (Total users, sellers, ebooks)
@@ -1459,17 +1465,21 @@ function MainApp() {
       </main>
 
       {/* Floating Quick Search (Search across real eBooks & Blogs) */}
-      <FloatingSearch
-        ebooks={ebooks}
-        blogPosts={displayedBlogPosts}
-        onSelectEbook={(b) => setSelectedEbook(b)}
-        onSelectBlogPost={(p) => {
-          handleOpenBlog(p);
-        }}
-      />
+      <Suspense fallback={null}>
+        <FloatingSearch
+          ebooks={ebooks}
+          blogPosts={displayedBlogPosts}
+          onSelectEbook={(b) => setSelectedEbook(b)}
+          onSelectBlogPost={(p) => {
+            handleOpenBlog(p);
+          }}
+        />
+      </Suspense>
 
       {/* Floating Live Chat & Customer Support Widget ("Can I help you?") */}
-      <LiveChatWidget sellerOnlineCount={totalSellersCount} />
+      <Suspense fallback={null}>
+        <LiveChatWidget sellerOnlineCount={totalSellersCount} />
+      </Suspense>
 
       {/* Universal Footer */}
       <Footer 
@@ -1479,48 +1489,60 @@ function MainApp() {
       />
 
       {/* MODAL 1: EBOOK DETAIL MODAL */}
-      <EbookDetailModal
-        ebook={selectedEbook}
-        onClose={() => setSelectedEbook(null)}
-        onBuyNow={handleBuyNow}
-        onOpenPreview={handleOpenPdfReader}
-        onOpenAuthModal={() => {
-          setIsAuthOpen(true);
-          setAuthInitialMode('user-login');
-        }}
-        ratingSummary={selectedEbook ? ratingSummaries[selectedEbook.id] : undefined}
-      />
+      {selectedEbook && (
+        <Suspense fallback={null}>
+          <EbookDetailModal
+            ebook={selectedEbook}
+            onClose={() => setSelectedEbook(null)}
+            onBuyNow={handleBuyNow}
+            onOpenPreview={handleOpenPdfReader}
+            onOpenAuthModal={() => {
+              setIsAuthOpen(true);
+              setAuthInitialMode('user-login');
+            }}
+            ratingSummary={selectedEbook ? ratingSummaries[selectedEbook.id] : undefined}
+          />
+        </Suspense>
+      )}
 
       {/* MODAL 2: CART MODAL */}
-      <CartModal
-        isOpen={isCartOpen}
-        onClose={() => setIsCartOpen(false)}
-        onProceedToCheckout={() => {
-          setIsCartOpen(false);
-          setDirectCheckoutItem(null);
-          setCurrentView('checkout');
-          window.scrollTo({ top: 0, behavior: 'smooth' });
-        }}
-      />
+      {isCartOpen && (
+        <Suspense fallback={null}>
+          <CartModal
+            isOpen={isCartOpen}
+            onClose={() => setIsCartOpen(false)}
+            onProceedToCheckout={() => {
+              setIsCartOpen(false);
+              setDirectCheckoutItem(null);
+              setCurrentView('checkout');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* MODAL 3: AUTH MODAL */}
-      <AuthModal
-        isOpen={isAuthOpen}
-        onClose={() => setIsAuthOpen(false)}
-        initialMode={authInitialMode}
-        onLoginSuccess={(role) => {
-          setIsAuthOpen(false);
-          if (role === 'admin') {
-            setIsAdminOpen(true);
-          } else if (role === 'seller') {
-            setCurrentView('seller-dashboard');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          } else {
-            setCurrentView('user-dashboard');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }
-        }}
-      />
+      {isAuthOpen && (
+        <Suspense fallback={null}>
+          <AuthModal
+            isOpen={isAuthOpen}
+            onClose={() => setIsAuthOpen(false)}
+            initialMode={authInitialMode}
+            onLoginSuccess={(role) => {
+              setIsAuthOpen(false);
+              if (role === 'admin') {
+                setIsAdminOpen(true);
+              } else if (role === 'seller') {
+                setCurrentView('seller-dashboard');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              } else {
+                setCurrentView('user-dashboard');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* MODAL 4: ADMIN PANEL */}
       {isAdminOpen && (
@@ -1578,15 +1600,17 @@ function MainApp() {
 
       {/* MODAL 6: BLOG FULL ARTICLE READER (Quick modal fallback if viewed outside dedicated blog page) */}
       {selectedBlogPost && currentView !== 'blog' && (
-        <BlogModal
-          post={selectedBlogPost}
-          onClose={() => setSelectedBlogPost(null)}
-          onExploreEbooks={() => {
-            setSelectedBlogPost(null);
-            setCurrentView('home');
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        />
+        <Suspense fallback={null}>
+          <BlogModal
+            post={selectedBlogPost}
+            onClose={() => setSelectedBlogPost(null)}
+            onExploreEbooks={() => {
+              setSelectedBlogPost(null);
+              setCurrentView('home');
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
+        </Suspense>
       )}
 
       {/* MODAL 7: TERMS & CONDITIONS */}

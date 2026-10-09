@@ -101,6 +101,10 @@ export const Footer: React.FC<FooterProps> = ({
                 <img 
                   src={`${import.meta.env.BASE_URL || '/'}ebookbazar-logo.jpg`} 
                   alt="eBookBazar Official Logo" 
+                  width={48}
+                  height={48}
+                  loading="lazy"
+                  decoding="async"
                   className="w-full h-full rounded-full object-cover"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
