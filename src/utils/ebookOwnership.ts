@@ -28,6 +28,21 @@ export const ADMIN_EMAILS = new Set([
   'redx0187@gmail.com',
 ]);
 
+// Initial catalog Admin eBook IDs
+export const KNOWN_ADMIN_EBOOK_IDS = new Set([
+  'bk-fullstack-dev-01',
+  'bk-freelancing-mastery-02',
+  'bk-digital-marketing-03',
+  'bk-bcs-preparation-04',
+  'bk-python-ml-05',
+]);
+
+// Initial catalog Seller eBook IDs
+export const KNOWN_SELLER_EBOOK_IDS = new Set([
+  'bk-business-startup-06',
+  'bk-mobile-flutter-07',
+]);
+
 export interface EbookOrOrderLike {
   id?: string | null;
   bookId?: string | null;
@@ -44,29 +59,69 @@ export function isEbookAdminOwned(
   item?: EbookOrOrderLike | null,
   matchedBook?: EbookOrOrderLike | null
 ): boolean {
-  // If we have a matched database/initial book reference, check it
+  // If we have a matched database/initial book reference, evaluate both
   const target = matchedBook || item;
-  if (!target) return true; // Default fallback to admin
+  if (!target && !item) return true; // Default fallback to admin
 
-  const sid = (target.sellerId || item?.sellerId || '').trim();
-  if (sid && (ADMIN_UIDS.has(sid) || ADMIN_UIDS.has(sid.toUpperCase()) || ADMIN_UIDS.has(sid.toLowerCase()))) {
-    return true;
-  }
-  if (!sid || sid.toLowerCase() === 'admin' || sid.toLowerCase() === 'ebookbazar') {
-    return true;
-  }
+  const bookId = (target?.id || item?.bookId || item?.id || '').trim();
 
-  const semail = (target.sellerEmail || item?.sellerEmail || '').trim().toLowerCase();
-  if (semail && ADMIN_EMAILS.has(semail)) {
-    return true;
+  // 1. Check known Seller eBook IDs first
+  if (bookId && KNOWN_SELLER_EBOOK_IDS.has(bookId)) {
+    return false;
   }
 
-  const sname = (target.sellerName || item?.sellerName || '').trim().toLowerCase();
+  // 2. Check known Admin eBook IDs and admin prefixes
+  if (bookId && (KNOWN_ADMIN_EBOOK_IDS.has(bookId) || bookId.toLowerCase().startsWith('admin-eb-'))) {
+    return true;
+  }
+
+  // 3. Check sellerId
+  const sid = (target?.sellerId || item?.sellerId || '').trim();
+  const isAdminSid = Boolean(
+    sid && (
+      ADMIN_UIDS.has(sid) ||
+      ADMIN_UIDS.has(sid.toUpperCase()) ||
+      ADMIN_UIDS.has(sid.toLowerCase()) ||
+      sid.toLowerCase() === 'admin' ||
+      sid.toLowerCase() === 'ebookbazar'
+    )
+  );
+
+  const semail = (target?.sellerEmail || item?.sellerEmail || '').trim().toLowerCase();
+  const isAdminEmail = Boolean(semail && ADMIN_EMAILS.has(semail));
+
+  // If explicitly admin UID or admin email
+  if (isAdminSid || isAdminEmail) {
+    return true;
+  }
+
+  // 4. Check isSeller flag
+  // If marked as seller book (uploaded by seller or from seller catalog) and not admin credentials
+  if (target?.isSeller === true || item?.isSeller === true) {
+    return false;
+  }
+
+  // 5. If sellerId belongs to a non-admin seller (e.g. SELLER_... or seller UID)
+  if (sid && !isAdminSid) {
+    return false;
+  }
+
+  // 6. If sellerEmail belongs to a non-admin seller
+  if (semail && !isAdminEmail && semail.includes('@')) {
+    return false;
+  }
+
+  // 7. Check sellerName
+  const sname = (target?.sellerName || item?.sellerName || '').trim().toLowerCase();
   if (sname.includes('admin') || sname.includes('ebookbazar পাবলিকেশন')) {
     return true;
   }
+  if (sname.includes('সেলার') || sname.includes('seller')) {
+    return false;
+  }
 
-  const author = (target.author || item?.author || '').trim().toLowerCase();
+  // 8. Check author
+  const author = (target?.author || item?.author || '').trim().toLowerCase();
   if (
     author === 'admin' ||
     author === 'admon' ||
@@ -76,25 +131,16 @@ export function isEbookAdminOwned(
   ) {
     return true;
   }
+  if (author.includes('সেলার') || author.includes('seller')) {
+    return false;
+  }
 
-  const bookId = (target.id || item?.bookId || item?.id || '').trim();
-  if (bookId.startsWith('admin-eb-') || bookId.startsWith('bk-')) {
+  // 9. If isSeller is explicitly false, it is Admin-owned
+  if (target?.isSeller === false || item?.isSeller === false) {
     return true;
   }
 
-  // If book was explicitly marked as a seller book by Seller Dashboard, and its seller is NOT an admin
-  if (target.isSeller === true) {
-    return false;
-  }
-  if (item?.isSeller === true && !matchedBook) {
-    // If no matched book found to verify, but order had isSeller
-    if (!sid || ADMIN_UIDS.has(sid) || (semail && ADMIN_EMAILS.has(semail))) {
-      return true;
-    }
-    return false;
-  }
-
-  // If isSeller is false or not set, it is admin-owned
+  // 10. Default fallback: Admin-owned
   return true;
 }
 

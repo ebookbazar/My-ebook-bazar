@@ -22,7 +22,7 @@ interface AuthContextType {
   userProfile: UserProfile | SellerProfile | null;
   isAdmin: boolean;
   loading: boolean;
-  login: (email: string, pass: string) => Promise<void>;
+  login: (email: string, pass: string) => Promise<{ profile: UserProfile | SellerProfile | null; isAdmin: boolean }>;
   registerUser: (data: {
     username: string;
     fullName: string;
@@ -168,8 +168,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setUserProfile(prof);
       setIsAdmin(userIsAdmin);
+      return { profile: prof, isAdmin: userIsAdmin };
     } catch (err) {
       console.error('Error loading profile:', err);
+      return { profile: null, isAdmin: false };
     }
   };
 
@@ -238,7 +240,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw err;
       }
     }
-    await loadProfile(cred.user);
+    return await loadProfile(cred.user);
   };
 
   const registerUser = async (data: {
@@ -396,6 +398,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const logout = async () => {
     await signOut(auth);
+    setCurrentUser(null);
     setUserProfile(null);
     setIsAdmin(false);
   };

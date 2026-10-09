@@ -12,6 +12,7 @@ export interface UserProfile {
   referralCode: string;
   referredBy?: string;
   affiliateBalance: number;
+  balance?: number;
   pendingWithdrawal?: number;
   totalWithdrawn?: number;
   totalEarnings: number;

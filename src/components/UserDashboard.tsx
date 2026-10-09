@@ -261,10 +261,19 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
     const unsubAff = onValue(ref(db, 'affiliateTransactions'), (snap) => {
       if (snap.exists()) {
         const myTxs: AffiliateTransaction[] = [];
+        const myCode = (userProfile?.referralCode || '').trim().toUpperCase();
         snap.forEach((ch) => {
           const val = ch.val() as AffiliateTransaction;
-          if (val && val.referrerUserId === currentUser.uid) {
-            myTxs.push({ ...val, id: ch.key as string });
+          if (val) {
+            const isMatch = Boolean(
+              val.referrerUserId === currentUser.uid ||
+              (val as any).referrerUid === currentUser.uid ||
+              (val as any).userId === currentUser.uid ||
+              (myCode && val.referralCode && val.referralCode.trim().toUpperCase() === myCode)
+            );
+            if (isMatch) {
+              myTxs.push({ ...val, id: ch.key as string });
+            }
           }
         });
         myTxs.sort((a, b) => (b.approvedAt || b.createdAt || 0) - (a.approvedAt || a.createdAt || 0));
@@ -324,28 +333,39 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
     };
   }, [currentUser, userProfile?.referralCode]);
 
+  const pendingWith = withdrawals
+    .filter(w => (w.status || '').toLowerCase() === 'pending')
+    .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+  const paidWith = withdrawals
+    .filter(w => (w.status || '').toLowerCase() === 'paid' || (w.status || '').toLowerCase() === 'approved')
+    .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
+  const approvedComm = myAffiliateTransactions
+    .filter(t => t.status === 'APPROVED')
+    .reduce((sum, t) => sum + (t.commissionAmount !== undefined ? (Number(t.commissionAmount) || 0) : 50), 0);
+  const availableBal = Math.max(
+    Number(userProfile?.affiliateBalance) || 0,
+    Number((userProfile as any)?.balance) || 0,
+    Math.max(0, approvedComm - (pendingWith + paidWith))
+  );
+  const totalComm = Math.max(
+    approvedComm,
+    Number(userProfile?.totalEarnings) || 0,
+    availableBal + paidWith
+  );
+
   // Auto-sync calculated affiliate earnings to database profile if transaction exists
   useEffect(() => {
     if (!currentUser) return;
-    const pendingWith = withdrawals
-      .filter(w => (w.status || '').toLowerCase() === 'pending')
-      .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
-    const paidWith = withdrawals
-      .filter(w => (w.status || '').toLowerCase() === 'paid' || (w.status || '').toLowerCase() === 'approved')
-      .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
-    const approvedComm = myAffiliateTransactions
-      .filter(t => t.status === 'APPROVED')
-      .reduce((sum, t) => sum + (Number(t.commissionAmount) || 50), 0);
-    const calculatedAvailable = Math.max(0, approvedComm - (pendingWith + paidWith));
-    const currentDbBal = Number(userProfile?.affiliateBalance) || 0;
+    const currentDbBal = Math.max(Number(userProfile?.affiliateBalance) || 0, Number((userProfile as any)?.balance) || 0);
 
-    if (calculatedAvailable > currentDbBal) {
+    if (availableBal > currentDbBal) {
       update(ref(db, `users/${currentUser.uid}`), {
-        affiliateBalance: calculatedAvailable,
-        totalEarnings: Math.max(Number(userProfile?.totalEarnings) || 0, approvedComm)
+        affiliateBalance: availableBal,
+        balance: availableBal,
+        totalEarnings: Math.max(Number(userProfile?.totalEarnings) || 0, totalComm)
       }).catch(() => {});
     }
-  }, [currentUser, myAffiliateTransactions, withdrawals, userProfile?.affiliateBalance, userProfile?.totalEarnings]);
+  }, [currentUser, availableBal, userProfile?.affiliateBalance, (userProfile as any)?.balance, userProfile?.totalEarnings, totalComm]);
 
   const handleCopyReferral = () => {
     if (!userProfile?.referralCode) return;
@@ -381,19 +401,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
       return;
     }
 
-    const pendingWith = withdrawals
-      .filter(w => (w.status || '').toLowerCase() === 'pending')
-      .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
-    const paidWith = withdrawals
-      .filter(w => (w.status || '').toLowerCase() === 'paid' || (w.status || '').toLowerCase() === 'approved')
-      .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
-    const approvedComm = myAffiliateTransactions
-      .filter(t => t.status === 'APPROVED')
-      .reduce((sum, t) => sum + (Number(t.commissionAmount) || 50), 0);
-    const currentBal = Math.max(
-      Number(userProfile.affiliateBalance) || 0,
-      Math.max(0, approvedComm - (pendingWith + paidWith))
-    );
+    const currentBal = availableBal;
     if (withdrawAmount < MIN_WITHDRAW) {
       setWithdrawErrorMsg(`সর্বনিম্ন উত্তোলনের পরিমাণ ৳${MIN_WITHDRAW}।`);
       return;
@@ -890,21 +898,6 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
 
           {/* Balance Cards (Rule 6) */}
           {(() => {
-            const pendingWith = withdrawals
-              .filter(w => (w.status || '').toLowerCase() === 'pending')
-              .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
-            const paidWith = withdrawals
-              .filter(w => (w.status || '').toLowerCase() === 'paid' || (w.status || '').toLowerCase() === 'approved')
-              .reduce((sum, w) => sum + (Number(w.amount) || 0), 0);
-            const approvedComm = myAffiliateTransactions
-              .filter(t => t.status === 'APPROVED')
-              .reduce((sum, t) => sum + (Number(t.commissionAmount) || 50), 0);
-            const totalComm = Math.max(approvedComm, Number(userProfile?.totalEarnings) || 0);
-            const availableBal = Math.max(
-              Number(userProfile?.affiliateBalance) || 0,
-              Math.max(0, approvedComm - (pendingWith + paidWith))
-            );
-
             return (
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
                 <div className="bg-white p-4 rounded-2xl border-2 border-emerald-500/40 shadow-sm">
@@ -997,7 +990,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                   <div>
                     <span className="text-[11px] font-bold text-slate-600 block">বর্তমান উত্তোলনযোগ্য ব্যালেন্স</span>
                     <span className="text-2xl font-black text-emerald-900 font-mono">
-                      ৳{(Number(userProfile?.affiliateBalance) || 0).toFixed(2)}
+                      ৳{availableBal.toFixed(2)}
                     </span>
                   </div>
                 </div>
@@ -1019,7 +1012,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                     উত্তোলনের পরিমাণ (Withdraw Amount) *
                   </label>
                   <span className="text-[11px] font-bold text-slate-400">
-                    সর্বনিম্ন ৳{MIN_WITHDRAW} | ওয়ালেটে আছে ৳{(Number(userProfile?.affiliateBalance) || 0).toFixed(2)}
+                    সর্বনিম্ন ৳{MIN_WITHDRAW} | ওয়ালেটে আছে ৳{availableBal.toFixed(2)}
                   </span>
                 </div>
 
@@ -1028,7 +1021,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                   <input
                     type="number"
                     min={MIN_WITHDRAW}
-                    max={Number(userProfile?.affiliateBalance) || 0}
+                    max={availableBal}
                     required
                     value={withdrawAmount}
                     onChange={(e) => {
@@ -1044,7 +1037,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   <span className="text-[10px] font-bold text-slate-400">কুইক অ্যামাউন্ট:</span>
                   {[50, 100, 200, 500].map((amt) => {
-                    const maxBal = Number(userProfile?.affiliateBalance) || 0;
+                    const maxBal = availableBal;
                     const isDisabled = amt > maxBal;
                     return (
                       <button
@@ -1067,16 +1060,16 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                       </button>
                     );
                   })}
-                  {Number(userProfile?.affiliateBalance) > 0 && (
+                  {availableBal > 0 && (
                     <button
                       type="button"
                       onClick={() => {
-                        setWithdrawAmount(Math.floor(Number(userProfile?.affiliateBalance) || 0));
+                        setWithdrawAmount(Math.floor(availableBal));
                         setWithdrawErrorMsg('');
                       }}
                       className="px-3 py-1 rounded-xl text-xs font-black bg-amber-100 hover:bg-amber-200 text-amber-900 border border-amber-300 transition"
                     >
-                      সব ব্যালেন্স (৳{Math.floor(Number(userProfile?.affiliateBalance) || 0)})
+                      সব ব্যালেন্স (৳{Math.floor(availableBal)})
                     </button>
                   )}
                 </div>
@@ -1168,7 +1161,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
               <div className="pt-2">
                 <button
                   type="submit"
-                  disabled={withdrawing || (Number(userProfile?.affiliateBalance) || 0) < MIN_WITHDRAW}
+                  disabled={withdrawing || availableBal < MIN_WITHDRAW}
                   className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-black py-3.5 px-6 rounded-2xl shadow-lg shadow-emerald-900/15 hover:shadow-xl transition-all text-sm flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.99]"
                 >
                   {withdrawing ? (
@@ -1184,7 +1177,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                   )}
                 </button>
 
-                {(Number(userProfile?.affiliateBalance) || 0) < MIN_WITHDRAW && (
+                {availableBal < MIN_WITHDRAW && (
                   <p className="text-center text-[11px] text-amber-700 font-bold mt-2 flex items-center justify-center gap-1">
                     <AlertCircle className="w-3.5 h-3.5" />
                     <span>উত্তোলনের জন্য ওয়ালেটে সর্বনিম্ন ৳{MIN_WITHDRAW} ব্যালেন্স প্রয়োজন। আপনার রেফারেল কোড শেয়ার করে কমিশন আর্ন করুন!</span>
@@ -1398,7 +1391,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                   <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200 flex justify-between items-center">
                     <span className="font-bold text-slate-700">বর্তমান উত্তোলনযোগ্য ব্যালেন্স:</span>
                     <span className="text-base font-black text-emerald-800 font-mono">
-                      ৳{(userProfile?.affiliateBalance || 0).toFixed(2)}
+                      ৳{availableBal.toFixed(2)}
                     </span>
                   </div>
 
@@ -1409,7 +1402,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                     <input
                       type="number"
                       min={MIN_WITHDRAW}
-                      max={Number(userProfile?.affiliateBalance) || 0}
+                      max={availableBal}
                       required
                       value={withdrawAmount}
                       onChange={(e) => setWithdrawAmount(Number(e.target.value))}
@@ -1461,7 +1454,7 @@ export const UserDashboard: React.FC<UserDashboardProps> = ({ onOpenReader, onNa
                     </button>
                     <button
                       type="submit"
-                      disabled={withdrawing || (Number(userProfile?.affiliateBalance) || 0) < withdrawAmount}
+                      disabled={withdrawing || availableBal < withdrawAmount}
                       className="flex-1 py-3 bg-[#15803d] hover:bg-emerald-800 text-white font-black rounded-xl shadow transition disabled:opacity-50"
                     >
                       {withdrawing ? 'সাবমিট হচ্ছে...' : 'রিকোয়েস্ট পাঠান'}

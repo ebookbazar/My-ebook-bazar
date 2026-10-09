@@ -20,7 +20,8 @@ import {
   ChevronRight,
   Sparkles,
   UserCheck,
-  Award
+  Award,
+  Calculator
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
@@ -31,6 +32,7 @@ interface AllFeaturesViewProps {
   onNavigateHome: () => void;
   onNavigateJob: () => void;
   onNavigateMembership: () => void;
+  onNavigateTools?: () => void;
 }
 
 export const AllFeaturesView: React.FC<AllFeaturesViewProps> = ({
@@ -39,7 +41,8 @@ export const AllFeaturesView: React.FC<AllFeaturesViewProps> = ({
   onNavigateUser,
   onNavigateHome,
   onNavigateJob,
-  onNavigateMembership
+  onNavigateMembership,
+  onNavigateTools
 }) => {
   const { currentUser, userProfile, isAdmin } = useAuth();
 
@@ -62,19 +65,23 @@ export const AllFeaturesView: React.FC<AllFeaturesViewProps> = ({
             eBookBazar-এর সম্পূর্ণ কন্ট্রোল প্যানেল ও ফিচারসমূহ
           </h1>
           <p className="text-sm md:text-base text-slate-300 max-w-3xl leading-relaxed">
-            এখানে অ্যাডমিন প্যানেলের ১২টি প্রশাসনিক টুল, সেলার ড্যাশবোর্ডের ৫টি ব্যবসায়িক ফিচার, এবং ইউজার ড্যাশবোর্ডের ৪টি ব্যক্তিগত ফিচার সরাসরি সাজানো রয়েছে। যেকোনো ফিচারে এক ক্লিকে প্রবেশ করুন।
+            {isAdmin 
+              ? 'এখানে অ্যাডমিন প্যানেলের ১২টি প্রশাসনিক টুল, সেলার ড্যাশবোর্ডের ৫টি ব্যবসায়িক ফিচার, এবং ইউজার ড্যাশবোর্ডের ৪টি ব্যক্তিগত ফিচার সরাসরি সাজানো রয়েছে।' 
+              : 'এখানে সেলার ড্যাশবোর্ডের ৫টি ব্যবসায়িক ফিচার এবং ইউজার ড্যাশবোর্ডের ৪টি ব্যক্তিগত ফিচার সরাসরি সাজানো রয়েছে।'}
           </p>
 
           {/* Quick Action Bar */}
           <div className="flex flex-wrap gap-3 pt-3 border-t border-emerald-800/60">
-            <button
-              onClick={onOpenAdmin}
-              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 group"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-950" />
-              <span>🛡️ অ্যাডমিন প্যানেল খুলুন</span>
-              <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
-            </button>
+            {isAdmin && (
+              <button
+                onClick={onOpenAdmin}
+                className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs md:text-sm px-4 py-2.5 rounded-xl shadow-lg transition flex items-center gap-2 group"
+              >
+                <ShieldCheck className="w-4 h-4 text-emerald-950" />
+                <span>🛡️ অ্যাডমিন প্যানেল খুলুন</span>
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
+              </button>
+            )}
 
             <button
               onClick={onNavigateSeller}
@@ -94,6 +101,17 @@ export const AllFeaturesView: React.FC<AllFeaturesViewProps> = ({
               <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
             </button>
 
+            {onNavigateTools && (
+              <button
+                onClick={onNavigateTools}
+                className="bg-emerald-800/80 hover:bg-emerald-700 text-white font-black text-xs md:text-sm px-4 py-2.5 rounded-xl shadow transition flex items-center gap-2 group border border-emerald-500/40"
+              >
+                <Calculator className="w-4 h-4 text-amber-300" />
+                <span>🧮 ফ্রি টুলস ও ক্যালকুলেটর</span>
+                <ChevronRight className="w-4 h-4 group-hover:translate-x-0.5 transition" />
+              </button>
+            )}
+
             <button
               onClick={onNavigateHome}
               className="bg-white/10 hover:bg-white/20 text-white font-bold text-xs md:text-sm px-4 py-2.5 rounded-xl transition flex items-center gap-1.5"
@@ -106,7 +124,8 @@ export const AllFeaturesView: React.FC<AllFeaturesViewProps> = ({
       </div>
 
       {/* SECTION 1: ADMIN PANEL (12 ALL FEATURES) */}
-      <section className="space-y-4">
+      {isAdmin && (
+        <section className="space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-3">
           <div className="flex items-center gap-2.5">
             <div className="w-9 h-9 rounded-xl bg-amber-100 text-amber-900 flex items-center justify-center font-black">
@@ -272,6 +291,7 @@ export const AllFeaturesView: React.FC<AllFeaturesViewProps> = ({
           </div>
         </div>
       </section>
+      )}
 
       {/* SECTION 2: SELLER DASHBOARD (5 ALL FEATURES) */}
       <section className="space-y-4 pt-4">
@@ -470,6 +490,49 @@ export const AllFeaturesView: React.FC<AllFeaturesViewProps> = ({
           <div className="bg-slate-800/80 p-3 rounded-2xl border border-slate-700/60">
             <span className="text-amber-400 text-xs font-black block">৳৫০০</span>
             <span className="text-[11px] font-bold text-slate-200 mt-1 block">Facebook/Insta ব্র্যান্ডিং</span>
+          </div>
+        </div>
+      </section>
+
+      {/* SECTION 5: FREE TOOLS & SMART CALCULATORS */}
+      <section className="bg-gradient-to-br from-emerald-900 via-teal-950 to-slate-900 p-6 md:p-8 rounded-3xl text-white border border-emerald-500/40 shadow-xl space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span className="text-[10px] font-black text-amber-400 uppercase tracking-wider block">ফ্রি ও দ্রুত ইউটিলিটি</span>
+            <h2 className="text-xl font-black text-white">৫. ফ্রি টুলস ও ক্যালকুলেটর (৫টি স্মার্ট ক্যালকুলেটর)</h2>
+            <p className="text-xs text-slate-300">লগইন ছাড়াই সঞ্চয়, মুনাফা, ছাড়, শতকরা ও দোকান লাভ মুহূর্তেই বের করার আধুনিক ফ্রি টুলস</p>
+          </div>
+          {onNavigateTools && (
+            <button
+              onClick={onNavigateTools}
+              className="bg-amber-400 hover:bg-amber-300 text-slate-950 font-black text-xs px-4 py-2.5 rounded-xl transition shadow flex items-center gap-1.5 self-start sm:self-auto"
+            >
+              <span>টুলস ব্যবহার করুন</span>
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="bg-emerald-950/60 p-3.5 rounded-2xl border border-emerald-500/30 text-center">
+            <span className="text-amber-300 text-xs font-black block">সঞ্চয় ক্যালকুলেটর</span>
+            <span className="text-[11px] text-emerald-200 mt-1 block">মাসিক ও বাৎসরিক সঞ্চয়ের হিসাব</span>
+          </div>
+          <div className="bg-emerald-950/60 p-3.5 rounded-2xl border border-emerald-500/30 text-center">
+            <span className="text-amber-300 text-xs font-black block">মুনাফা ক্যালকুলেটর</span>
+            <span className="text-[11px] text-emerald-200 mt-1 block">ক্রয়-বিক্রয় ও নিট লাভ মার্জিন</span>
+          </div>
+          <div className="bg-emerald-950/60 p-3.5 rounded-2xl border border-emerald-500/30 text-center">
+            <span className="text-amber-300 text-xs font-black block">ছাড় ক্যালকুলেটর</span>
+            <span className="text-[11px] text-emerald-200 mt-1 block">ডিসকাউন্ট ও চূড়ান্ত আসল মূল্য</span>
+          </div>
+          <div className="bg-emerald-950/60 p-3.5 rounded-2xl border border-emerald-500/30 text-center">
+            <span className="text-amber-300 text-xs font-black block">শতকরা ক্যালকুলেটর</span>
+            <span className="text-[11px] text-emerald-200 mt-1 block">বৃদ্ধি, হ্রাস ও শতাংশের অনুপাত</span>
+          </div>
+          <div className="bg-emerald-950/60 p-3.5 rounded-2xl border border-emerald-500/30 text-center">
+            <span className="text-amber-300 text-xs font-black block">দোকান লাভ ক্যালকুলেটর</span>
+            <span className="text-[11px] text-emerald-200 mt-1 block">ব্যবসায় পাইকারি ও খুচরা টার্নওভার</span>
           </div>
         </div>
       </section>

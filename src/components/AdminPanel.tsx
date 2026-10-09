@@ -45,11 +45,14 @@ import {
   Home,
   Star,
   Trophy,
-  CornerDownRight
+  CornerDownRight,
+  Calculator
 } from 'lucide-react';
+import { AdminFreeToolsManager } from './AdminFreeToolsManager';
 import { auth, db, ref, onValue, update, remove, set, push, get, serverTimestamp, signInWithEmailAndPassword, onAuthStateChanged, runTransaction } from '../firebase';
 import { INITIAL_EBOOKS } from '../data/initialEbooks';
 import { isEbookAdminOwned, isEbookSellerOwned } from '../utils/ebookOwnership';
+import { awardReferralCommission } from '../utils/referralCommission';
 
 const SUPER_ADMIN_EMAILS = ['suma47083@gmail.com', 'admin@ebookbazar.com'];
 import { 
@@ -74,7 +77,8 @@ import {
   LeaderboardPost,
   LeaderboardRole,
   LeaderboardPostType,
-  AdminReply
+  AdminReply,
+  BlogPost
 } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { calculateAppDownloadMetrics, resetAppDownloadStats, formatAndValidateDownloadUrl } from '../services/appDownloadService';
@@ -110,6 +114,7 @@ interface AdminPanelProps {
   onOpenBlogManager?: () => void;
   onNavigateHome?: () => void;
   ratingSummaries?: Record<string, EbookRatingSummary>;
+  blogPosts?: BlogPost[];
 }
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ 
@@ -117,18 +122,35 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   onOpenReader, 
   onOpenBlogManager, 
   onNavigateHome,
-  ratingSummaries: propsSummaries
+  ratingSummaries: propsSummaries,
+  blogPosts = []
 }) => {
-  const { currentUser, userProfile, isAdmin, logout, login, resetPassword } = useAuth();
+  const { currentUser, userProfile, isAdmin, logout, login, resetPassword, loading: authLoading } = useAuth();
 
-  // Admin Login / Logout State & Handlers
-  const [isLoginModalOpen, setIsLoginModalOpen] = useState(false);
-  const [loginEmail, setLoginEmail] = useState('admin@ebookbazar.com');
-  const [loginPassword, setLoginPassword] = useState('Admin@123456');
+  // Action Toast Notification (non-blocking)
+  const [actionToast, setActionToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
+
+  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
+    setActionToast({ type, message });
+    setTimeout(() => {
+      setActionToast(prev => (prev?.message === message ? null : prev));
+    }, 4500);
+  };
+
+  // Admin Login State & Handlers
+  const [loginEmail, setLoginEmail] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
 
   const handleGoToHome = () => {
-    setIsLoginModalOpen(false);
+    if (typeof window !== 'undefined') {
+      if (window.location.hash.toLowerCase() === '#admin') {
+        window.history.replaceState(null, '', window.location.pathname || '/');
+      }
+      if (window.location.pathname.startsWith('/admin')) {
+        window.history.replaceState(null, '', '/');
+      }
+    }
     onClose();
     if (onNavigateHome) {
       onNavigateHome();
@@ -141,12 +163,36 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       if (currentUser) {
         await logout();
       }
+      // Explicitly clear in-memory admin cached state
+      setUsers({});
+      setSellers({});
+      setEbooks({});
+      setOrders({});
+      setWithdrawRequests({});
+      setWithdrawals({});
+      setMembershipRequests({});
+      setAffiliateTransactions({});
+      setTickets({});
+      setLeaderboardPosts([]);
+      setLoginEmail('');
+      setLoginPassword('');
       showToast('info', 'অ্যাডমিন অ্যাকাউন্ট থেকে লগআউট সম্পন্ন হয়েছে।');
     } catch (err: any) {
       console.error('Logout error:', err);
     } finally {
-      // Immediately open and show Admin Login modal
-      setIsLoginModalOpen(true);
+      if (typeof window !== 'undefined') {
+        if (window.location.hash.toLowerCase() === '#admin') {
+          window.history.replaceState(null, '', window.location.pathname || '/');
+        }
+        if (window.location.pathname.startsWith('/admin')) {
+          window.history.replaceState(null, '', '/');
+        }
+      }
+      onClose();
+      if (onNavigateHome) {
+        onNavigateHome();
+      }
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     }
   };
 
@@ -158,9 +204,13 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
     setLoggingIn(true);
     try {
-      await login(loginEmail.trim(), loginPassword.trim());
+      const res = await login(loginEmail.trim(), loginPassword.trim());
+      if (!res.isAdmin && res.profile?.role !== 'admin') {
+        await logout();
+        showToast('error', 'এই অ্যাকাউন্টের জন্য অ্যাডমিন অনুমোদন নেই। শুধুমাত্র অনুমোদিত অ্যাডমিন প্রবেশ করতে পারবেন।');
+        return;
+      }
       showToast('success', 'অ্যাডমিন হিসেবে সফলভাবে লগইন সম্পন্ন হয়েছে!');
-      setIsLoginModalOpen(false);
     } catch (err: any) {
       console.error('Admin Login error:', err);
       showToast('error', 'লগইন ব্যর্থ হয়েছে: ' + (err?.message || err));
@@ -184,8 +234,29 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Tabs
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'users' | 'sellers' | 'ebooks' | 'orders' | 'memberships' | 'withdrawals' | 'settings' | 'notifications' | 'affiliates' | 'rules' | 'xml' | 'tickets' | 'app-download' | 'leaderboard'
+    'overview' | 'users' | 'sellers' | 'ebooks' | 'orders' | 'memberships' | 'withdrawals' | 'settings' | 'notifications' | 'affiliates' | 'rules' | 'xml' | 'tickets' | 'app-download' | 'leaderboard' | 'tools'
   >('overview');
+
+  // Synchronize active tab from URL route if specified (e.g. /admin/orders, /admin/users)
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const path = (window.location.pathname + window.location.hash).toLowerCase();
+      if (path.includes('orders')) setActiveTab('orders');
+      else if (path.includes('users')) setActiveTab('users');
+      else if (path.includes('sellers')) setActiveTab('sellers');
+      else if (path.includes('ebooks')) setActiveTab('ebooks');
+      else if (path.includes('memberships')) setActiveTab('memberships');
+      else if (path.includes('withdrawals')) setActiveTab('withdrawals');
+      else if (path.includes('settings')) setActiveTab('settings');
+      else if (path.includes('notifications')) setActiveTab('notifications');
+      else if (path.includes('affiliates')) setActiveTab('affiliates');
+      else if (path.includes('rules')) setActiveTab('rules');
+      else if (path.includes('tickets')) setActiveTab('tickets');
+      else if (path.includes('app-download')) setActiveTab('app-download');
+      else if (path.includes('leaderboard')) setActiveTab('leaderboard');
+      else if (path.includes('tools')) setActiveTab('tools');
+    }
+  }, []);
 
   // App Download Settings & Statistics State (Simplified: Only URL & Download Count)
   const [appDownloadUrl, setAppDownloadUrl] = useState<string>('');
@@ -339,16 +410,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Per-request custom upload limit inputs
   const [customReqLimits, setCustomReqLimits] = useState<Record<string, number>>({});
-
-  // Action Toast Notification (non-blocking)
-  const [actionToast, setActionToast] = useState<{ type: 'success' | 'error' | 'info'; message: string } | null>(null);
-
-  const showToast = (type: 'success' | 'error' | 'info', message: string) => {
-    setActionToast({ type, message });
-    setTimeout(() => {
-      setActionToast(prev => (prev?.message === message ? null : prev));
-    }, 4500);
-  };
 
   // XML Export Content
   const [xmlContent, setXmlContent] = useState<string>('');
@@ -562,41 +623,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       };
     };
 
-    // Attach initial subscriptions
-    cleanupCurrentSubs = attachAdminSubscriptions();
-
-    // Ensure Admin Authorization: If current user is not an authorized admin, sign in as master admin
-    const ensureAdminAuth = async () => {
-      const current = auth.currentUser;
-      const isCurrentAdmin = current && current.email && SUPER_ADMIN_EMAILS.includes(current.email.toLowerCase());
-      if (!isCurrentAdmin) {
-        try {
-          await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
-          // Re-attach subscriptions under the verified admin session
-          if (cleanupCurrentSubs) cleanupCurrentSubs();
-          cleanupCurrentSubs = attachAdminSubscriptions();
-        } catch (authErr) {
-          console.warn('Admin self-contained auth notice:', authErr);
-        }
-      }
-    };
-
-    ensureAdminAuth();
-
-    // Re-attach subscriptions whenever auth state changes to an authorized admin
-    const unsubAuth = onAuthStateChanged(auth, (user) => {
-      if (user && user.email && SUPER_ADMIN_EMAILS.includes(user.email.toLowerCase())) {
-        if (cleanupCurrentSubs) cleanupCurrentSubs();
-        cleanupCurrentSubs = attachAdminSubscriptions();
-      }
-    });
+    // Attach subscriptions ONLY if the user is verified as admin
+    if (currentUser && isAdmin) {
+      cleanupCurrentSubs = attachAdminSubscriptions();
+    } else {
+      // Clear data when not authorized as admin
+      setUsers({});
+      setSellers({});
+      setEbooks({});
+      setOrders({});
+      setWithdrawRequests({});
+      setWithdrawals({});
+      setMembershipRequests({});
+      setAffiliateTransactions({});
+      setTickets({});
+    }
 
     return () => {
       active = false;
       if (cleanupCurrentSubs) cleanupCurrentSubs();
-      unsubAuth();
     };
-  }, []);
+  }, [currentUser, isAdmin]);
 
   // Arrays derived from records
   const userList = Object.entries(users).map(([id, u]) => ({ ...u, uid: id }));
@@ -816,18 +863,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // 2. Order Approval (Automatically updates library, seller sales, and affiliate commission)
   const handleApproveOrder = async (order: Order) => {
-    if (order.status === 'approved') {
-      showToast('info', 'এই অর্ডারটি ইতিমধ্যে অনুমোদিত হয়েছে।');
+    if (order.status === 'approved' && order.commissionAwarded) {
+      showToast('info', 'এই অর্ডারটি ইতিমধ্যে অনুমোদিত এবং কমিশন প্রদান করা হয়েছে।');
       return;
     }
 
-    // Ensure admin authentication for database writes
-    if (!auth.currentUser) {
-      try {
-        await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
-      } catch (authErr) {
-        console.warn('Admin approval temporary auth notice:', authErr);
-      }
+    if (!currentUser || !isAdmin) {
+      showToast('error', 'শুধুমাত্র অনুমোদিত অ্যাডমিন অর্ডার অনুমোদন করতে পারেন।');
+      return;
     }
 
     // Determine the exact key of this order in Firebase and state
@@ -912,11 +955,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     showToast('success', `অর্ডার ${order.orderId || order.id} সফলভাবে অনুমোদন করা হয়েছে! ক্রেতার লাইব্রেরিতে বই যোগ হয়েছে।`);
 
     try {
-      // Step 1: Write directly to orders node FIRST so approval status is guaranteed
+      // Step 1: Write approval status to orders node
       const orderDirectUpdate: Record<string, any> = {
         status: 'approved',
-        approvedAt: Date.now(),
-        commissionProcessed: true
+        approvedAt: Date.now()
       };
       await update(ref(db, `orders/${orderKey}`), orderDirectUpdate);
 
@@ -1023,257 +1065,37 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       //    No referral transaction/commission record is created for Seller eBooks.
       // 3. Duplicate Protection:
       //    Admin eBook commission is awarded only once per order (prevent duplicate execution on refresh/callbacks).
-      if (isSellerBook) {
-        // Seller eBook: STRICTLY 0 BDT referral commission regardless of referral code
-        // Seller earning was already credited to seller's wallet in Step 4.
-        await update(ref(db, `orders/${orderKey}`), {
-          commissionAwarded: false,
-          commissionAmount: 0,
-          commissionText: hasRefCode 
-            ? 'সেলার ই-বুক (রেফারেল কমিশন প্রযোজ্য নয়: ৳০)' 
-            : 'রেফারেল কোড ছাড়া ক্রয়',
-          commissionNote: hasRefCode 
-            ? `সেলার ই-বুকে কোনো রেফারেল কমিশন নেই (৳০)। সেলার ওয়ালেটে ৳${order.amount} বিক্রয় আয় জমা হয়েছে।` 
-            : `সেলার ই-বুক: সেলার ওয়ালেটে ৳${order.amount} বিক্রয় আয় জমা হয়েছে।`,
-          commissionProcessed: true
-        });
-      } else if (isAdminBook) {
-        // Admin eBook: Eligible for 50 BDT commission if valid referral code is provided
-        if (hasRefCode && !order.commissionAwarded) {
-          const cleanRefCode = order.referralCode!.trim().toUpperCase();
-          const txKey = `${orderKey}_EBOOK_REFERRAL`;
+      // Step 5: Referral Commission Business Logic (Strict Final Rule)
+      // 1. Admin eBook:
+      //    Buyer uses valid referral code -> Referral owner balance += 50 BDT (+৳50)
+      // 2. Seller eBook:
+      //    Referral commission is NEVER awarded (+৳0). Seller receives full ebook sale earning (already credited in Step 4).
+      //    No referral transaction/commission record is created for Seller eBooks.
+      // 3. Duplicate Protection:
+      //    Admin eBook commission is awarded only once per order (prevent duplicate execution on refresh/callbacks).
+      const refResult = await awardReferralCommission({
+        orderKey,
+        orderData: { ...order, ...orderDirectUpdate },
+        db,
+        matchedBook
+      });
 
-          try {
-            // Prevent duplicate commission execution
-            const existingTxSnap = await get(ref(db, `affiliateTransactions/${txKey}`));
-            if (!existingTxSnap.exists()) {
-              // Find referrer across in-memory state and database
-              let referrerUid: string | null = null;
-              let referrerProfile: any = null;
-
-              // 1. Search in-memory users
-              const userEntries = Object.entries(users);
-              const foundUser = userEntries.find(([_, u]) => (u.referralCode || '').trim().toUpperCase() === cleanRefCode);
-              if (foundUser) {
-                referrerUid = foundUser[0];
-                referrerProfile = foundUser[1];
-              }
-
-              // 2. Search database users
-              if (!referrerUid) {
-                try {
-                  const uSnap = await get(ref(db, 'users'));
-                  if (uSnap.exists()) {
-                    const allU = uSnap.val();
-                    const matched = Object.entries(allU).find(([_, u]: [string, any]) => (u.referralCode || '').trim().toUpperCase() === cleanRefCode);
-                    if (matched) {
-                      referrerUid = matched[0];
-                      referrerProfile = matched[1];
-                    }
-                  }
-                } catch (_) {}
-              }
-
-              // 3. Search sellers node if referrer registered as seller
-              if (!referrerUid) {
-                try {
-                  const sSnap = await get(ref(db, 'sellers'));
-                  if (sSnap.exists()) {
-                    const allS = sSnap.val();
-                    const matchedS = Object.entries(allS).find(([_, s]: [string, any]) => (s.referralCode || '').trim().toUpperCase() === cleanRefCode);
-                    if (matchedS) {
-                      referrerUid = matchedS[0];
-                      referrerProfile = matchedS[1];
-                    }
-                  }
-                } catch (_) {}
-              }
-
-              // 4. Search referralCodes index node
-              if (!referrerUid) {
-                try {
-                  const rcSnap = await get(ref(db, `referralCodes/${cleanRefCode}`));
-                  if (rcSnap.exists()) {
-                    const rcData = rcSnap.val();
-                    if (rcData?.uid) {
-                      referrerUid = rcData.uid;
-                      referrerProfile = rcData;
-                    }
-                  }
-                } catch (_) {}
-              }
-
-              const buyerId = order.buyerId || (order as any).uid || (order as any).userId;
-              const isSelfReferral = !!(referrerUid && buyerId && referrerUid === buyerId);
-
-              if (isSelfReferral) {
-                // Self-referral forbidden: 0 BDT commission
-                await set(ref(db, `affiliateTransactions/${txKey}`), {
-                  transactionId: txKey,
-                  referrerUserId: referrerUid,
-                  referrerName: referrerProfile?.fullName || 'Self',
-                  referralCode: cleanRefCode,
-                  buyerUserId: buyerId,
-                  buyerName: order.buyerName || 'ক্রেতা',
-                  orderId: order.orderId || orderKey,
-                  ebookId: order.bookId,
-                  ebookTitle: order.bookTitle || matchedBook?.title || 'ই-বুক',
-                  commissionAmount: 0,
-                  commissionType: 'EBOOK_REFERRAL',
-                  status: 'REJECTED_SELF_REFERRAL',
-                  createdAt: order.createdAt || Date.now(),
-                  approvedAt: Date.now()
-                });
-
-                await update(ref(db, `orders/${orderKey}`), {
-                  commissionAwarded: false,
-                  commissionAmount: 0,
-                  commissionText: 'সেলফ-রেফারেল (কমিশন: ৳০)',
-                  commissionNote: 'সেলফ-রেফারেল নিষিদ্ধ হওয়ায় কোনো রেফারেল কমিশন দেওয়া হয়নি (৳০)',
-                  commissionProcessed: true
-                });
-              } else if (referrerUid) {
-                // Valid other user referral on Admin eBook: Award 50 BDT to referrer
-                const commAmt = 50;
-                let liveData = referrerProfile;
-
-                // 1. Atomically update balance in affiliateBalances node
-                await runTransaction(ref(db, `affiliateBalances/${referrerUid}/balance`), (curr: any) => {
-                  return (Number(curr) || 0) + commAmt;
-                }).catch(() => {});
-
-                // 2. Fetch live latest balance from DB and update users node
-                try {
-                  const userRef = ref(db, `users/${referrerUid}`);
-                  const freshSnap = await get(userRef);
-                  if (freshSnap.exists()) {
-                    liveData = freshSnap.val();
-                  }
-
-                  const currentBal = Number(liveData?.affiliateBalance) || 0;
-                  const currentTotal = Number(liveData?.totalEarnings) || 0;
-                  const newBal = currentBal + commAmt;
-                  const newTotal = currentTotal + commAmt;
-
-                  await update(userRef, {
-                    affiliateBalance: newBal,
-                    totalEarnings: newTotal
-                  }).catch(() => {});
-                } catch (_) {}
-
-                // 3. Sync sellers node if profile exists there
-                try {
-                  const sellerCheck = await get(ref(db, `sellers/${referrerUid}`));
-                  if (sellerCheck.exists()) {
-                    const sData = sellerCheck.val();
-                    const sBal = Number(sData?.affiliateBalance) || 0;
-                    await update(ref(db, `sellers/${referrerUid}`), {
-                      affiliateBalance: sBal + commAmt,
-                      totalEarnings: (Number(sData?.totalEarnings) || 0) + commAmt
-                    }).catch(() => {});
-                  }
-                } catch (_) {}
-
-                // Optimistic update in Admin Panel users state
-                setUsers(prev => ({
-                  ...prev,
-                  [referrerUid!]: {
-                    ...(prev[referrerUid!] || referrerProfile),
-                    affiliateBalance: (Number(prev[referrerUid!]?.affiliateBalance) || 0) + commAmt,
-                    totalEarnings: (Number(prev[referrerUid!]?.totalEarnings) || 0) + commAmt
-                  }
-                }));
-
-                // Transaction Record in affiliateTransactions/{transactionId}
-                const txRecord = {
-                  transactionId: txKey,
-                  referrerUserId: referrerUid,
-                  referrerName: liveData?.fullName || referrerProfile?.fullName || 'রেফারার',
-                  referralCode: cleanRefCode,
-                  buyerUserId: buyerId || 'buyer',
-                  buyerName: order.buyerName || 'ক্রেতা',
-                  orderId: order.orderId || orderKey,
-                  ebookId: order.bookId,
-                  ebookTitle: order.bookTitle || matchedBook?.title || 'ই-বুক',
-                  commissionAmount: commAmt,
-                  commissionType: 'EBOOK_REFERRAL',
-                  status: 'APPROVED',
-                  createdAt: order.createdAt || Date.now(),
-                  approvedAt: Date.now()
-                };
-
-                await set(ref(db, `affiliateTransactions/${txKey}`), txRecord);
-
-                // Also sync legacy commissions node
-                await set(ref(db, `commissions/${txKey}`), {
-                  id: txKey,
-                  referrerUid,
-                  referrerName: liveData?.fullName || referrerProfile?.fullName || 'রেফারার',
-                  referrerEmail: liveData?.email || referrerProfile?.email || '',
-                  buyerId: buyerId || 'buyer',
-                  buyerName: order.buyerName || 'ক্রেতা',
-                  orderId: order.orderId || orderKey,
-                  bookTitle: order.bookTitle || matchedBook?.title || 'ই-বুক',
-                  amount: commAmt,
-                  type: 'ebook_referral',
-                  text: 'অ্যাডমিন ই-বুক অ্যাফিলিয়েট কমিশন: ৳৫০',
-                  commissionText: 'অ্যাডমিন ই-বুক অ্যাফিলিয়েট কমিশন: ৳৫০',
-                  note: `অ্যাডমিন ই-বুকে রেফারেল কোড (${cleanRefCode}) ব্যবহারের জন্য ৳৫০ কমিশন প্রদান করা হয়েছে`,
-                  createdAt: Date.now()
-                });
-
-                // Notification to referrer
-                const rNotifRef = push(ref(db, `notifications/${referrerUid}`));
-                if (rNotifRef.key) {
-                  await set(rNotifRef, {
-                    id: rNotifRef.key,
-                    title: '🎉 ৳৫০ অ্যাফিলিয়েট রেফারেল কমিশন জমা হয়েছে!',
-                    message: `আপনার রেফারেল কোড (${cleanRefCode}) দিয়ে অ্যাডমিন ই-বুক "${order.bookTitle || matchedBook?.title || 'বই'}" ক্রয় করা হয়েছে। ৳৫০ রেফারেল কমিশন আপনার ওয়ালেটে জমা হয়েছে।`,
-                    createdAt: Date.now(),
-                    read: false
-                  });
-                }
-
-                // Update order record
-                await update(ref(db, `orders/${orderKey}`), {
-                  commissionAwarded: true,
-                  commissionAmount: commAmt,
-                  commissionText: 'অ্যাডমিন ই-বুক অ্যাফিলিয়েট কমিশন: ৳৫০',
-                  commissionNote: 'অ্যাডমিন ই-বুক: রেফারার পেয়েছে ৳৫০ রেফারেল কমিশন | ক্রেতা ৳০ কমিশন',
-                  commissionProcessed: true
-                });
-
-                showToast('success', `অর্ডার অনুমোদিত! ৳৫০ রেফারেল কমিশন রেফারারের অ্যাকাউন্টে যোগ করা হয়েছে।`);
-              } else {
-                // Invalid referral code provided
-                await update(ref(db, `orders/${orderKey}`), {
-                  commissionAwarded: false,
-                  commissionAmount: 0,
-                  commissionText: 'অবৈধ রেফারেল কোড (কমিশন: ৳০)',
-                  commissionNote: `রেফারেল কোড (${cleanRefCode}) সিস্টেমে পাওয়া যায়নি`,
-                  commissionProcessed: true
-                });
-                showToast('info', `অর্ডার অনুমোদিত! তবে রেফারেল কোড (${cleanRefCode}) সিস্টেমে না থাকায় কোনো কমিশন দেওয়া হয়নি।`);
-              }
-            } else {
-              // Already processed duplicate - prevent double crediting
-              await update(ref(db, `orders/${orderKey}`), {
-                commissionProcessed: true
-              });
-            }
-          } catch (cErr) {
-            console.warn('Commission update warning:', cErr);
+      if (refResult.success && refResult.referrerUid) {
+        // Optimistic update in Admin Panel users state
+        setUsers(prev => ({
+          ...prev,
+          [refResult.referrerUid!]: {
+            ...prev[refResult.referrerUid!],
+            affiliateBalance: (Number(prev[refResult.referrerUid!]?.affiliateBalance) || 0) + 50,
+            balance: (Number(prev[refResult.referrerUid!]?.balance) || 0) + 50,
+            totalEarnings: (Number(prev[refResult.referrerUid!]?.totalEarnings) || 0) + 50
           }
-        } else if (!hasRefCode) {
-          // Admin eBook without referral code
-          await update(ref(db, `orders/${orderKey}`), {
-            commissionAwarded: false,
-            commissionAmount: 0,
-            commissionText: 'রেফারেল কোড ছাড়া ক্রয়',
-            commissionNote: 'অ্যাডমিন ই-বুক: কোনো রেফারেল কোড ব্যবহার করা হয়নি',
-            commissionProcessed: true
-          });
-        }
+        }));
+        showToast('success', 'অর্ডার অনুমোদিত! ৳৫০ রেফারেল কমিশন রেফারারের অ্যাকাউন্টে যোগ করা হয়েছে।');
+      } else if (refResult.duplicate) {
+        console.log('Referral commission was already credited for this order.');
+      } else if (hasRefCode && isSellerBook) {
+        showToast('info', 'সেলার ই-বুক: সেলার ওয়ালেটে বিক্রয় আয় জমা হয়েছে (সেলার ই-বুকে রেফারেল কমিশন প্রযোজ্য নয়: ৳০)।');
       }
     } catch (err: any) {
       console.error('Order approval error:', err);
@@ -1886,13 +1708,9 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     const finalUrl = validation.formattedUrl || trimmedUrl;
 
-    // Ensure admin authentication is active; if not, automatically authenticate with master credentials
-    if (!auth.currentUser) {
-      try {
-        await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
-      } catch (authErr) {
-        console.warn('Auto-admin auth notice:', authErr);
-      }
+    if (!currentUser || !isAdmin) {
+      showToast('error', 'শুধুমাত্র অনুমোদিত অ্যাডমিন App Download লিঙ্ক সংরক্ষণ করতে পারেন।');
+      return;
     }
 
     try {
@@ -1967,12 +1785,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
     setSavingAppDownload(true);
 
-    if (!auth.currentUser) {
-      try {
-        await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
-      } catch (authErr) {
-        console.warn('Auto-admin auth notice:', authErr);
-      }
+    if (!currentUser || !isAdmin) {
+      showToast('error', 'শুধুমাত্র অনুমোদিত অ্যাডমিন এটি পরিবর্তন করতে পারেন।');
+      setSavingAppDownload(false);
+      return;
     }
 
     try {
@@ -2173,6 +1989,174 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  // AUTH GUARD 1: Authentication loading state
+  if (authLoading) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md p-4 flex items-center justify-center animate-fadeIn">
+        <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl text-center space-y-4 border border-slate-200">
+          <div className="w-16 h-16 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center mx-auto">
+            <ShieldCheck className="w-8 h-8 text-emerald-700 animate-pulse" />
+          </div>
+          <h3 className="text-lg font-black text-slate-900">অ্যাডমিন অথেনটিকেশন যাচাই করা হচ্ছে...</h3>
+          <p className="text-xs text-slate-500">Firebase অথেন্টিকেশন ও অ্যাডমিন রোল যাচাই করা হচ্ছে, দয়া করে অপেক্ষা করুন।</p>
+          <div className="w-8 h-8 border-3 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+        </div>
+      </div>
+    );
+  }
+
+  // AUTH GUARD 2: If not authenticated OR not admin role, show dedicated Admin Login Screen
+  if (!currentUser || !isAdmin) {
+    return (
+      <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md p-3 sm:p-6 overflow-y-auto flex items-center justify-center animate-fadeIn">
+        {/* Action Toast */}
+        {actionToast && (
+          <div
+            className={`fixed top-5 right-5 z-60 px-4 py-3 rounded-2xl shadow-2xl text-sm font-bold flex items-center gap-2 border transition-all animate-bounce ${
+              actionToast.type === 'success'
+                ? 'bg-emerald-600 text-white border-emerald-400'
+                : actionToast.type === 'error'
+                ? 'bg-rose-600 text-white border-rose-400'
+                : 'bg-slate-900 text-white border-slate-700'
+            }`}
+          >
+            {actionToast.type === 'success' ? <CheckCircle className="w-5 h-5" /> : <AlertTriangle className="w-5 h-5" />}
+            <span>{actionToast.message}</span>
+          </div>
+        )}
+
+        <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5 animate-scale-up">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center shadow-xs">
+                <ShieldCheck className="w-6 h-6 text-emerald-700" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black text-slate-900">eBookBazar মাস্টার অ্যাডমিন</h3>
+                <p className="text-xs text-slate-500">নিরাপদ অ্যাডমিন অথেন্টিকেশন গেটওয়ে</p>
+              </div>
+            </div>
+            <button
+              onClick={handleGoToHome}
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition text-base font-bold"
+              title="ওয়েবসাইট হোমে যান"
+            >
+              ✕
+            </button>
+          </div>
+
+          {/* If currently logged in as a normal user or seller */}
+          {currentUser && !isAdmin && (
+            <div className="bg-amber-50 rounded-2xl p-4 border border-amber-200/80 space-y-3">
+              <div className="flex items-start gap-2.5">
+                <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                <div className="text-xs text-amber-900 leading-relaxed">
+                  <p className="font-black text-amber-950 mb-1">অ্যাক্সেস সংরক্ষিত!</p>
+                  <p>
+                    আপনি বর্তমানে <strong>{currentUser.email}</strong> অ্যাকাউন্টে লগইন আছেন (রোল:{' '}
+                    <span className="font-bold uppercase text-amber-800">
+                      {userProfile?.role === 'seller' ? 'সেলার (Seller)' : 'সাধারণ ইউজার (User)'}
+                    </span>
+                    )। এই অ্যাকাউন্টের জন্য মাস্টার অ্যাডমিন ড্যাশবোর্ডে প্রবেশের অনুমতি নেই।
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-col gap-2 pt-1">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await logout();
+                    showToast('info', 'বর্তমান অ্যাকাউন্ট থেকে লগআউট সম্পন্ন হয়েছে। এবার অ্যাডমিন দিয়ে লগইন করুন।');
+                  }}
+                  className="w-full bg-rose-600 hover:bg-rose-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 active:scale-95 shadow-xs"
+                >
+                  <LogOut className="w-4 h-4" />
+                  <span>বর্তমান অ্যাকাউন্ট লগআউট করুন</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleGoToHome}
+                  className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2 px-3 rounded-xl text-xs transition flex items-center justify-center gap-1.5 active:scale-95"
+                >
+                  <Home className="w-4 h-4 text-emerald-700" />
+                  <span>ওয়েবসাইট হোমপেজে ফিরে যান</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Admin Login Form (Shown when logged out) */}
+          {!currentUser && (
+            <form onSubmit={handleAdminLogin} className="space-y-4">
+              <div className="space-y-1.5">
+                <label className="block text-xs font-black text-slate-700">অ্যাডমিন ইমেইল ঠিকানা</label>
+                <div className="relative">
+                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="email"
+                    required
+                    value={loginEmail}
+                    onChange={(e) => setLoginEmail(e.target.value)}
+                    placeholder="admin@ebookbazar.com"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white transition"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center">
+                  <label className="block text-xs font-black text-slate-700">অ্যাডমিন পাসওয়ার্ড</label>
+                  <button
+                    type="button"
+                    onClick={handleResetPassword}
+                    className="text-[11px] text-amber-600 hover:text-amber-700 font-bold hover:underline"
+                  >
+                    পাসওয়ার্ড ভুলে গেছেন?
+                  </button>
+                </div>
+                <div className="relative">
+                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
+                  <input
+                    type="password"
+                    required
+                    value={loginPassword}
+                    onChange={(e) => setLoginPassword(e.target.value)}
+                    placeholder="••••••••"
+                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white transition"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2">
+                <button
+                  type="submit"
+                  disabled={loggingIn}
+                  className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-black py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
+                >
+                  <LogIn className="w-4 h-4" />
+                  <span>{loggingIn ? 'লগইন যাচাই হচ্ছে...' : 'অ্যাডমিন হিসেবে লগইন করুন'}</span>
+                </button>
+
+                <div className="pt-2 border-t border-slate-100">
+                  <button
+                    type="button"
+                    onClick={handleGoToHome}
+                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs active:scale-95"
+                  >
+                    <Home className="w-4 h-4 text-emerald-700" />
+                    <span>ওয়েবসাইট হোমপেজে ফিরে যান (Go to Home)</span>
+                  </button>
+                </div>
+              </div>
+            </form>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/90 backdrop-blur-md p-2 md:p-6 overflow-y-auto flex items-center justify-center animate-fadeIn">
       <div className="w-full max-w-7xl bg-white rounded-3xl shadow-2xl overflow-hidden border border-slate-200 flex flex-col max-h-[95vh]">
@@ -2219,19 +2203,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <button
               onClick={handleLogout}
               className="bg-rose-600 hover:bg-rose-700 text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition shadow-xs active:scale-95"
-              title="অ্যাডমিন প্যানেল থেকে লগআউট করুন এবং লগইন উইন্ডো দেখুন"
+              title="অ্যাডমিন প্যানেল থেকে লগআউট করুন এবং সেশন সমাপ্ত করুন"
             >
               <LogOut className="w-4 h-4" />
               <span>লগআউট</span>
-            </button>
-
-            <button
-              onClick={() => setIsLoginModalOpen(true)}
-              className="bg-amber-400 hover:bg-amber-500 text-slate-950 px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-1.5 transition shadow-xs active:scale-95"
-              title="অ্যাডমিন হিসেবে লগইন করুন"
-            >
-              <LogIn className="w-4 h-4" />
-              <span>লগইন</span>
             </button>
 
             <button
@@ -2426,6 +2401,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <span>App Download</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('tools')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'tools' ? 'bg-[#15803d] text-white shadow ring-2 ring-amber-400' : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <Calculator className="w-4 h-4 text-amber-400" />
+            <span>ফ্রি টুলস (Free Tools)</span>
+          </button>
+
           {onOpenBlogManager && (
             <button
               onClick={onOpenBlogManager}
@@ -2503,15 +2488,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   >
                     <Home className="w-4 h-4 text-amber-300" />
                     <span>ওয়েবসাইট হোম</span>
-                  </button>
-
-                  <button
-                    onClick={() => setIsLoginModalOpen(true)}
-                    className="flex-1 sm:flex-none bg-amber-400 hover:bg-amber-500 text-slate-950 px-4 py-2 rounded-xl text-xs font-black flex items-center justify-center gap-1.5 transition shadow-xs active:scale-95"
-                    title="অ্যাডমিন লগইন স্ক্রিন খুলুন"
-                  >
-                    <LogIn className="w-4 h-4" />
-                    <span>লগইন (Login)</span>
                   </button>
                 </div>
               </div>
@@ -3086,6 +3062,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                               </div>
                             ) : o.status === 'approved' ? (
                               <div className="inline-flex items-center gap-2">
+                                {!isSellerBook && o.referralCode && !o.commissionAwarded && (
+                                  <button
+                                    onClick={() => handleApproveOrder(o)}
+                                    className="bg-amber-500 hover:bg-amber-600 text-slate-950 font-black px-2.5 py-1 rounded-lg text-xs shadow-xs inline-flex items-center gap-1 transition active:scale-95"
+                                    title="রেফারেল কমিশন যোগ করুন (+৳৫০)"
+                                  >
+                                    <Sparkles className="w-3.5 h-3.5" />
+                                    <span>কমিশন যোগ করুন (+৳৫০)</span>
+                                  </button>
+                                )}
                                 <span className="inline-flex items-center gap-1 text-emerald-700 font-bold text-xs bg-emerald-50 px-2.5 py-1 rounded-lg border border-emerald-200">
                                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
                                   <span>অনুমোদিত</span>
@@ -4516,6 +4502,15 @@ service cloud.firestore {
                 </form>
               </div>
             </div>
+          )}
+
+          {/* TAB: FREE TOOLS MANAGEMENT */}
+          {activeTab === 'tools' && (
+            <AdminFreeToolsManager
+              showToast={showToast}
+              blogPosts={blogPosts}
+              ebooks={ebooks}
+            />
           )}
 
           {/* TAB: SUPPORT TICKET MANAGEMENT */}
@@ -6676,134 +6671,7 @@ service cloud.firestore {
         </div>
       )}
 
-      {/* Admin Quick Login Modal */}
-      {isLoginModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-xs p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-md w-full p-6 sm:p-8 shadow-2xl border border-slate-200 space-y-5 animate-scale-up">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <ShieldCheck className="w-6 h-6 text-emerald-700" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-black text-slate-900">অ্যাডমিন লগইন</h3>
-                  <p className="text-xs text-slate-500">লগইন করুন অথবা সরাসরি ওয়েবসাইটে ফিরে যান</p>
-                </div>
-              </div>
-              <button
-                onClick={handleGoToHome}
-                className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-600 flex items-center justify-center transition text-sm font-bold"
-                title="ওয়েবসাইট হোমে যান"
-              >
-                ✕
-              </button>
-            </div>
 
-            {/* Quick Option to Return to Website Home */}
-            <div className="bg-emerald-50 rounded-2xl p-3 border border-emerald-200/80 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-xs text-emerald-800 font-medium">
-                <Home className="w-4 h-4 text-emerald-700 shrink-0" />
-                <span>লগআউট করা হয়েছে। ওয়েবসাইটে ফিরে যেতে চান?</span>
-              </div>
-              <button
-                type="button"
-                onClick={handleGoToHome}
-                className="bg-[#15803d] hover:bg-emerald-800 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition shrink-0 shadow-xs flex items-center gap-1 active:scale-95"
-              >
-                <span>হোমে যান</span>
-                <span>→</span>
-              </button>
-            </div>
-
-            <form onSubmit={handleAdminLogin} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="block text-xs font-black text-slate-700">ইমেইল ঠিকানা</label>
-                <div className="relative">
-                  <Mail className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                  <input
-                    type="email"
-                    required
-                    value={loginEmail}
-                    onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="admin@ebookbazar.com"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div className="space-y-1.5">
-                <div className="flex justify-between items-center">
-                  <label className="block text-xs font-black text-slate-700">পাসওয়ার্ড</label>
-                  <button
-                    type="button"
-                    onClick={handleResetPassword}
-                    className="text-[11px] text-amber-600 hover:text-amber-700 font-bold hover:underline"
-                  >
-                    পাসওয়ার্ড ভুলে গেছেন?
-                  </button>
-                </div>
-                <div className="relative">
-                  <Lock className="w-4 h-4 text-slate-400 absolute left-3.5 top-3.5" />
-                  <input
-                    type="password"
-                    required
-                    value={loginPassword}
-                    onChange={(e) => setLoginPassword(e.target.value)}
-                    placeholder="••••••••"
-                    className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-              </div>
-
-              <div className="pt-2 flex flex-col gap-2">
-                <button
-                  type="submit"
-                  disabled={loggingIn}
-                  className="w-full bg-[#15803d] hover:bg-emerald-800 text-white font-black py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50 text-sm"
-                >
-                  <LogIn className="w-4 h-4" />
-                  <span>{loggingIn ? 'লগইন হচ্ছে...' : 'লগইন করুন'}</span>
-                </button>
-
-                <div className="flex items-center justify-center gap-3 pt-2 text-[11px] text-slate-500">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('admin@ebookbazar.com');
-                      setLoginPassword('Admin@123456');
-                    }}
-                    className="text-emerald-700 font-bold hover:underline"
-                  >
-                    ⚡ admin@ebookbazar.com
-                  </button>
-                  <span>•</span>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setLoginEmail('suma47083@gmail.com');
-                      setLoginPassword('Admin@123456');
-                    }}
-                    className="text-indigo-600 font-bold hover:underline"
-                  >
-                    suma47083@gmail.com
-                  </button>
-                </div>
-
-                <div className="pt-2 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={handleGoToHome}
-                    className="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl transition flex items-center justify-center gap-2 text-xs active:scale-95"
-                  >
-                    <Home className="w-4 h-4 text-emerald-700" />
-                    <span>ওয়েবসাইট হোমপেজে ফিরে যান (Go to Website Home)</span>
-                  </button>
-                </div>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };

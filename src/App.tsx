@@ -54,6 +54,10 @@ const AboutView = lazy(() => import('./components/AboutView').then(m => ({ defau
 const TermsView = lazy(() => import('./components/TermsView').then(m => ({ default: m.TermsView })));
 const BlogView = lazy(() => import('./components/BlogView').then(m => ({ default: m.BlogView })));
 const AdminBlogManagerModal = lazy(() => import('./components/AdminBlogManagerModal').then(m => ({ default: m.AdminBlogManagerModal })));
+const FreeToolsView = lazy(() => import('./components/FreeToolsView').then(m => ({ default: m.FreeToolsView })));
+import { HomeFreeToolsSection } from './components/HomeFreeToolsSection';
+import { FreeToolConfig, ToolId } from './types/freeTools';
+import { DEFAULT_FREE_TOOLS } from './data/defaultFreeTools';
 
 // Lightweight smooth loader for lazy views
 const ViewLoadingFallback: React.FC = () => (
@@ -95,10 +99,49 @@ const CATEGORIES = [
 
 function MainApp() {
   const { currentUser, userProfile, isAdmin, login } = useAuth();
-  const { isCartOpen, setIsCartOpen } = useCart();
+  const { isCartOpen, setIsCartOpen, addToCart } = useCart();
 
   // Navigation View
   const [currentView, setCurrentView] = useState<string>('home');
+
+  // Free Tools State
+  const [freeTools, setFreeTools] = useState<FreeToolConfig[]>(DEFAULT_FREE_TOOLS);
+  const [selectedToolId, setSelectedToolId] = useState<ToolId | null>(null);
+
+  // Sync Free Tools settings from Firebase RTDB in real time
+  useEffect(() => {
+    const unsubTools = onValue(ref(db, 'freeTools'), (snap) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        const merged = DEFAULT_FREE_TOOLS.map(def => {
+          if (val[def.id]) {
+            return { ...def, ...val[def.id] };
+          }
+          return def;
+        });
+        setFreeTools(merged.sort((a, b) => a.sortOrder - b.sortOrder));
+      } else {
+        setFreeTools(DEFAULT_FREE_TOOLS);
+      }
+    }, () => {});
+    return () => unsubTools();
+  }, []);
+
+  const handleAddToCart = (book: Ebook) => {
+    addToCart({
+      id: book.id,
+      title: book.title,
+      price: book.price,
+      coverUrl: book.coverUrl,
+      author: book.author,
+      qty: 1,
+      isSeller: Boolean(book.isSeller),
+      sellerId: book.sellerId,
+      sellerEmail: book.sellerEmail,
+      sellerReferralCode: book.sellerReferralCode
+    });
+    setIsCartOpen(true);
+  };
 
   // Modals
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -126,11 +169,8 @@ function MainApp() {
 
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
     const initialReal = getInitialBlogPosts();
-    if (initialReal.length > 0) {
-      return initialReal;
-    }
-    const hideDemo = getLocalHideDemoBlogs();
-    return hideDemo ? [] : BLOG_POSTS;
+    // Only return real published blog posts from database/cache/DOM, never demo fallback
+    return initialReal.filter(p => !p.isDemo);
   });
 
   // Ebooks from Firebase + Initial Fallback
@@ -407,24 +447,18 @@ function MainApp() {
     };
   }, []);
 
-  // Filter blog posts (Production Blogger LIVE POSTs take priority, strictly excludes PAGE and SOFT_TRASHED)
+  // Filter blog posts (Displays ONLY REAL published posts from database, strictly excludes demo, PAGE, and SOFT_TRASHED/DRAFT)
   const displayedBlogPosts = useMemo(() => {
-    // 1. Filter only valid Blogger LIVE POSTs
-    const validPosts = blogPosts.filter(p => {
+    return blogPosts.filter(p => {
+      // Must not be demo or sample
+      if (p.isDemo) return false;
       // Must not be PAGE
       if (p.type === 'PAGE') return false;
       // Must not be SOFT_TRASHED or DRAFT
       if (p.status && (p.status === 'SOFT_TRASHED' || p.status === 'DRAFT')) return false;
       return true;
     });
-
-    const hasRealPosts = validPosts.some(p => !p.isDemo);
-    return validPosts.filter(p => {
-      // In production mode or when real Blogger posts exist, automatically hide demo content
-      if ((hideDemoBlogs || hasRealPosts) && p.isDemo) return false;
-      return true;
-    });
-  }, [blogPosts, hideDemoBlogs]);
+  }, [blogPosts]);
 
   // Synchronize URL routing for /blog and /blog/:slug with HTML5 history and popstate
   const getAppBaseUrl = () => (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
@@ -473,6 +507,16 @@ function MainApp() {
         setSelectedBlogPost(null);
         setBlogNotFoundSlug(null);
         setCurrentView(prev => (prev === 'blog' ? 'home' : prev));
+      } else if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+        setIsAdminOpen(true);
+      } else if (pathname === '/tools' || pathname.startsWith('/tools/')) {
+        setCurrentView('tools');
+        const sub = pathname.replace('/tools', '').replace(/^\//, '').replace(/\/$/, '').trim();
+        if (sub) {
+          setSelectedToolId(sub as ToolId);
+        } else {
+          setSelectedToolId(null);
+        }
       }
     };
 
@@ -537,6 +581,14 @@ function MainApp() {
         setCurrentView('seller-dashboard');
       } else if (hash === '#dashboard' || hash === '#user') {
         setCurrentView('user-dashboard');
+      } else if (hash === '#tools' || hash.startsWith('#tools/')) {
+        setCurrentView('tools');
+        const sub = hash.replace('#tools', '').replace(/^\//, '').trim();
+        if (sub) {
+          setSelectedToolId(sub as ToolId);
+        } else {
+          setSelectedToolId(null);
+        }
       }
     };
 
@@ -565,11 +617,12 @@ function MainApp() {
     }
   }, [currentView]);
 
-  // When User or Seller logs out, automatically show Home page
+  // When User, Seller, or Admin logs out, automatically show Home page and close admin panel
   const prevUserRef = React.useRef(currentUser);
   useEffect(() => {
     if (prevUserRef.current && !currentUser) {
       setCurrentView('home');
+      setIsAdminOpen(false);
       window.scrollTo({ top: 0, behavior: 'smooth' });
     }
     prevUserRef.current = currentUser;
@@ -677,65 +730,27 @@ function MainApp() {
               }}
             />
 
-            {/* 4. Universal Role & Feature Quick Navigation Bar */}
-            <div className="bg-white/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 border border-slate-200/90 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
-              <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5">
-                <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider hidden sm:inline px-1">
-                  ড্যাশবোর্ড হাব:
-                </span>
-                <button
-                  onClick={() => { setCurrentView('all-features'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200"
-                >
-                  <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                  <span>সকল ফিচার ({12 + 5 + 4}টি)</span>
-                </button>
-                <button
-                  onClick={() => setIsAdminOpen(true)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm"
-                  title="১২টি ফিচারসহ অ্যাডমিন প্যানেল"
-                >
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                  <span>অ্যাডমিন প্যানেল (১২)</span>
-                </button>
-                <button
-                  onClick={() => { setCurrentView('seller-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200"
-                  title="৫টি ফিচারসহ সেলার ড্যাশবোর্ড"
-                >
-                  <Briefcase className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>সেলার প্যানেল (৫)</span>
-                </button>
-                <button
-                  onClick={() => { setCurrentView('user-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200"
-                  title="৪টি ফিচারসহ ইউজার ড্যাশবোর্ড"
-                >
-                  <Users className="w-3.5 h-3.5 text-slate-700" />
-                  <span>ইউজার ড্যাশবোর্ড (৪)</span>
-                </button>
-                <button
-                  onClick={() => {
-                    const el = document.getElementById('leaderboard');
-                    if (el) {
-                      el.scrollIntoView({ behavior: 'smooth' });
-                    }
-                  }}
-                  className="px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 shadow-xs active:scale-95"
-                  title="🏆 ইউজার, সেলার ও ক্রেতাদের অভিজ্ঞতা ও মতামত"
-                >
-                  <Trophy className="w-3.5 h-3.5 text-amber-600 fill-amber-400" />
-                  <span>লিডারবোর্ড</span>
-                </button>
-              </div>
-            </div>
-
             {/* 5. আজকের বাছাই (Top 3 Real Curated eBooks from Firebase) */}
             <CuratedPicksSection
               ebooks={ebooks}
               onViewDetails={(book) => setSelectedEbook(book)}
               onBuyNow={handleBuyNow}
               ratingSummaries={ratingSummaries}
+            />
+
+            {/* 5.1 ফ্রি ক্যালকুলেটর ও স্মার্ট টুলস (Free Tools Section) */}
+            <HomeFreeToolsSection
+              tools={freeTools}
+              onOpenTool={(toolId) => {
+                setSelectedToolId(toolId);
+                setCurrentView('tools');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenAllTools={() => {
+                setSelectedToolId(null);
+                setCurrentView('tools');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
 
             {/* 6. জনপ্রিয় বিভাগ ও ফিল্টার সার্চ */}
@@ -921,111 +936,69 @@ function MainApp() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {displayedBlogPosts.slice(0, 3).map((post) => (
-                  <div 
-                    key={post.id}
-                    onClick={() => handleOpenBlog(post)}
-                    className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer group hover:-translate-y-1 subtle-card-hover"
-                  >
-                    <div>
-                      <div className="aspect-[16/10] overflow-hidden bg-slate-100 relative">
-                        <img 
-                          src={post.coverImage} 
-                          alt={post.imageAlt || post.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                          loading="lazy"
-                        />
-                        <span className="absolute top-3 left-3 bg-[#15803d]/95 backdrop-blur-md text-white text-xs font-black px-3 py-1 rounded-xl shadow-md border border-emerald-500/30">
-                          {post.category}
-                        </span>
-                      </div>
-
-                      <div className="p-5 sm:p-6 space-y-3">
-                        <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-500 font-semibold">
-                          <span className="flex items-center gap-1.5">
-                            <Calendar className="w-4 h-4 text-emerald-600" />
-                            <span>{post.date}</span>
-                          </span>
-                          <span className="flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 text-emerald-600" />
-                            <span>{post.readTime}</span>
+              {displayedBlogPosts.length === 0 ? (
+                <div className="bg-white rounded-3xl p-10 sm:p-12 text-center border border-slate-200 space-y-4 shadow-xs">
+                  <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto text-emerald-700">
+                    <BookOpen className="w-7 h-7" />
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-bold text-slate-800">এখনও কোনো ব্লগ পোস্ট প্রকাশিত হয়নি</h3>
+                  <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
+                    খুব শীঘ্রই আমাদের নতুন তথ্যবহুল ব্লগ পোস্ট ও ক্যারিয়ার গাইড প্রকাশিত হবে।
+                  </p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {displayedBlogPosts.slice(0, 3).map((post) => (
+                    <div 
+                      key={post.id}
+                      onClick={() => handleOpenBlog(post)}
+                      className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer group hover:-translate-y-1 subtle-card-hover"
+                    >
+                      <div>
+                        <div className="aspect-[16/10] overflow-hidden bg-slate-100 relative">
+                          <img 
+                            src={post.coverImage} 
+                            alt={post.imageAlt || post.title}
+                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
+                            loading="lazy"
+                          />
+                          <span className="absolute top-3 left-3 bg-[#15803d]/95 backdrop-blur-md text-white text-xs font-black px-3 py-1 rounded-xl shadow-md border border-emerald-500/30">
+                            {post.category}
                           </span>
                         </div>
 
-                        <h3 className="font-black text-slate-900 text-base sm:text-lg lg:text-xl leading-snug group-hover:text-emerald-700 transition">
-                          {post.title}
-                        </h3>
+                        <div className="p-5 sm:p-6 space-y-3">
+                          <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-500 font-semibold">
+                            <span className="flex items-center gap-1.5">
+                              <Calendar className="w-4 h-4 text-emerald-600" />
+                              <span>{post.date}</span>
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              <Clock className="w-4 h-4 text-emerald-600" />
+                              <span>{post.readTime}</span>
+                            </span>
+                          </div>
 
-                        <p className="text-xs sm:text-sm md:text-base text-slate-600 leading-relaxed line-clamp-3 font-medium">
-                          {post.excerpt}
-                        </p>
+                          <h3 className="font-black text-slate-900 text-base sm:text-lg lg:text-xl leading-snug group-hover:text-emerald-700 transition">
+                            {post.title}
+                          </h3>
+
+                          <p className="text-xs sm:text-sm md:text-base text-slate-600 leading-relaxed line-clamp-3 font-medium">
+                            {post.excerpt}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="p-5 sm:p-6 pt-0 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm md:text-base">
+                        <span className="text-xs sm:text-sm text-slate-500 font-bold">{post.author}</span>
+                        <span className="text-emerald-700 font-black flex items-center gap-1 group-hover:translate-x-1.5 transition-transform">
+                          সম্পূর্ণ পড়ুন <ArrowRight className="w-4 h-4" />
+                        </span>
                       </div>
                     </div>
-
-                    <div className="p-5 sm:p-6 pt-0 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm md:text-base">
-                      <span className="text-xs sm:text-sm text-slate-500 font-bold">{post.author}</span>
-                      <span className="text-emerald-700 font-black flex items-center gap-1 group-hover:translate-x-1.5 transition-transform">
-                        সম্পূর্ণ পড়ুন <ArrowRight className="w-4 h-4" />
-                      </span>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Universal Role & Feature Quick Navigation Bar for Other Pages */}
-        {currentView !== 'home' && (
-          <div className="bg-white/95 backdrop-blur-md rounded-2xl p-2.5 sm:p-3 mb-6 border border-slate-200/90 shadow-sm flex flex-wrap items-center justify-between gap-2.5">
-            <div className="flex items-center gap-2 overflow-x-auto scrollbar-none py-0.5">
-              <span className="text-[11px] font-black text-slate-500 uppercase tracking-wider hidden sm:inline px-1">
-                ড্যাশবোর্ড হাব:
-              </span>
-              <button
-                onClick={() => { setCurrentView('all-features'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 ${
-                  currentView === 'all-features'
-                    ? 'bg-amber-400 text-slate-950 shadow-sm'
-                    : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-200'
-                }`}
-              >
-                <Sparkles className="w-3.5 h-3.5 text-amber-600" />
-                <span>সকল ফিচার ({12 + 5 + 4}টি)</span>
-              </button>
-              <button
-                onClick={() => setIsAdminOpen(true)}
-                className="px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 text-white shadow-sm"
-                title="১২টি ফিচারসহ অ্যাডমিন প্যানেল"
-              >
-                <ShieldCheck className="w-3.5 h-3.5 text-amber-400" />
-                <span>অ্যাডমিন প্যানেল (১২)</span>
-              </button>
-              <button
-                onClick={() => { setCurrentView('seller-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 ${
-                  currentView === 'seller-dashboard'
-                    ? 'bg-[#15803d] text-white shadow-sm'
-                    : 'bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-200'
-                }`}
-                title="৫টি ফিচারসহ সেলার ড্যাশবোর্ড"
-              >
-                <Briefcase className="w-3.5 h-3.5 text-emerald-700" />
-                <span>সেলার প্যানেল (৫)</span>
-              </button>
-              <button
-                onClick={() => { setCurrentView('user-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                className={`px-3 py-1.5 rounded-xl text-xs font-black transition flex items-center gap-1.5 ${
-                  currentView === 'user-dashboard'
-                    ? 'bg-[#15803d] text-white shadow-sm'
-                    : 'bg-slate-100 hover:bg-slate-200 text-slate-800 border border-slate-200'
-                }`}
-                title="৪টি ফিচারসহ ইউজার ড্যাশবোর্ড"
-              >
-                <Users className="w-3.5 h-3.5 text-slate-700" />
-                <span>ইউজার ড্যাশবোর্ড (৪)</span>
-              </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1459,6 +1432,27 @@ function MainApp() {
               onNavigateHome={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               onNavigateJob={() => { setCurrentView('job'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
               onNavigateMembership={() => { setCurrentView('membership'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+              onNavigateTools={() => { setCurrentView('tools'); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+            />
+          </Suspense>
+        )}
+
+        {/* VIEW 14: FREE TOOLS & SMART CALCULATORS */}
+        {currentView === 'tools' && (
+          <Suspense fallback={<ViewLoadingFallback />}>
+            <FreeToolsView
+              tools={freeTools}
+              selectedToolId={selectedToolId}
+              onSelectTool={(toolId) => setSelectedToolId(toolId)}
+              onNavigateHome={() => {
+                setCurrentView('home');
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenBlog={handleOpenBlog}
+              onViewEbook={(b) => setSelectedEbook(b)}
+              onAddToCart={handleAddToCart}
+              allBlogPosts={blogPosts}
+              allEbooks={ebooks}
             />
           </Suspense>
         )}
@@ -1514,6 +1508,18 @@ function MainApp() {
         isOpen={isAuthOpen}
         onClose={() => setIsAuthOpen(false)}
         initialMode={authInitialMode}
+        onLoginSuccess={(role) => {
+          setIsAuthOpen(false);
+          if (role === 'admin') {
+            setIsAdminOpen(true);
+          } else if (role === 'seller') {
+            setCurrentView('seller-dashboard');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          } else {
+            setCurrentView('user-dashboard');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }
+        }}
       />
 
       {/* MODAL 4: ADMIN PANEL */}
@@ -1533,6 +1539,7 @@ function MainApp() {
             onOpenReader={handleOpenPdfReader}
             onOpenBlogManager={() => setIsAdminBlogManagerOpen(true)}
             ratingSummaries={ratingSummaries}
+            blogPosts={blogPosts}
           />
         </Suspense>
       )}

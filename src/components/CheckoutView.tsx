@@ -14,6 +14,7 @@ import { useCart } from '../context/CartContext';
 import { CartItem, Ebook } from '../types';
 import { db, push, set, ref, serverTimestamp, auth, signInWithEmailAndPassword, signOut } from '../firebase';
 import { isEbookSellerOwned } from '../utils/ebookOwnership';
+import { awardReferralCommission } from '../utils/referralCommission';
 
 interface CheckoutViewProps {
   directItem: Ebook | null;
@@ -106,10 +107,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
     }
 
     setSubmitting(true);
+    const isGuest = !currentUser;
     try {
       // Create separate order entries or bundled entry with unique Order ID
       const ordersRef = ref(db, 'orders');
-      const isGuest = !currentUser;
 
       // If guest/unauthenticated user, temporarily ensure authorized write access to persist order record
       if (isGuest && !auth.currentUser) {
@@ -151,6 +152,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
         };
 
         await set(ref(db, `orders/${orderKey}`), orderData);
+
+        // Process referral commission for Admin eBook purchase with strict eligibility rules
+        await awardReferralCommission({
+          orderKey,
+          orderData,
+          db,
+          matchedBook: item
+        }).catch((refErr) => console.warn('Referral commission processing notice:', refErr));
       }
 
       // If this was a guest order, sign out immediately so client session remains guest/unauthenticated
@@ -168,6 +177,10 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       console.error('Order submission error:', err);
       alert('অর্ডার সাবমিট করতে সমস্যা হয়েছে: ' + (err?.message || err));
       setSubmitting(false);
+    } finally {
+      if (isGuest && auth.currentUser?.email === 'admin@ebookbazar.com') {
+        await signOut(auth).catch(() => {});
+      }
     }
   };
 

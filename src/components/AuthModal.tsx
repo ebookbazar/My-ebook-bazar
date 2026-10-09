@@ -6,12 +6,14 @@ interface AuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMode?: 'user-login' | 'user-register' | 'seller-register' | 'admin-login';
+  onLoginSuccess?: (role: 'admin' | 'seller' | 'user') => void;
 }
 
 export const AuthModal: React.FC<AuthModalProps> = ({ 
   isOpen, 
   onClose, 
-  initialMode = 'user-login' 
+  initialMode = 'user-login',
+  onLoginSuccess
 }) => {
   const { login, registerUser, registerSeller } = useAuth();
   const [mode, setMode] = useState<'user-login' | 'user-register' | 'seller-register' | 'admin-login'>(initialMode);
@@ -42,9 +44,15 @@ export const AuthModal: React.FC<AuthModalProps> = ({
 
     try {
       if (mode === 'user-login' || mode === 'admin-login') {
-        await login(email, password);
+        const result = await login(email, password);
         setLoading(false);
         onClose();
+        if (onLoginSuccess) {
+          const role = (result?.isAdmin || result?.profile?.role === 'admin')
+            ? 'admin'
+            : (result?.profile?.role === 'seller' ? 'seller' : 'user');
+          onLoginSuccess(role);
+        }
       } else if (mode === 'user-register') {
         if (!fullName.trim() || !phone.trim()) {
           throw new Error('নাম এবং মোবাইল নম্বর অবশ্যই প্রদান করতে হবে।');
@@ -64,6 +72,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setLoading(false);
         alert('অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে! আপনার একটি অনন্য রেফারেল কোড তৈরি হয়েছে।');
         onClose();
+        if (onLoginSuccess) {
+          onLoginSuccess('user');
+        }
       } else if (mode === 'seller-register') {
         if (!fullName.trim() || !paymentMobile.trim()) {
           throw new Error('সেলার নাম এবং পেমেন্ট নম্বর অবশ্যই প্রদান করতে হবে।');
@@ -80,6 +91,9 @@ export const AuthModal: React.FC<AuthModalProps> = ({
         setLoading(false);
         alert('সেলার অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে! এখন আপনি সেলার ড্যাশবোর্ডে প্রবেশ করতে পারবেন।');
         onClose();
+        if (onLoginSuccess) {
+          onLoginSuccess('seller');
+        }
       }
     } catch (err: any) {
       setLoading(false);

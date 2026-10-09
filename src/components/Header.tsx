@@ -19,7 +19,8 @@ import {
   Sparkles,
   ChevronDown,
   ChevronRight,
-  Trophy
+  Trophy,
+  Calculator
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCart } from '../context/CartContext';
@@ -143,25 +144,22 @@ export const Header: React.FC<HeaderProps> = ({
             >
               মার্কেটপ্লেস
             </button>
-            <button 
-              onClick={() => { setCurrentView('all-features'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-amber-300 transition flex items-center gap-1 py-1 ${currentView === 'all-features' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : 'text-amber-200'}`}
-            >
-              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-              <span>সব ফিচার হাব</span>
-            </button>
-            <button 
-              onClick={() => { setCurrentView('seller-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-amber-300 transition py-1 ${currentView === 'seller-dashboard' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
-            >
-              সেলার প্যানেল
-            </button>
-            <button 
-              onClick={() => { setCurrentView('user-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-amber-300 transition py-1 ${currentView === 'user-dashboard' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
-            >
-              ইউজার ড্যাশবোর্ড
-            </button>
+            {userProfile?.role === 'seller' && (
+              <button 
+                onClick={() => { setCurrentView('seller-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+                className={`hover:text-amber-300 transition py-1 ${currentView === 'seller-dashboard' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
+              >
+                সেলার প্যানেল
+              </button>
+            )}
+            {currentUser && userProfile?.role !== 'seller' && !isAdmin && (
+              <button 
+                onClick={() => { setCurrentView('user-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+                className={`hover:text-amber-300 transition py-1 ${currentView === 'user-dashboard' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
+              >
+                ইউজার ড্যাশবোর্ড
+              </button>
+            )}
             <button 
               onClick={() => { setCurrentView('blog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
               className={`hover:text-amber-300 transition py-1 ${currentView === 'blog' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
@@ -196,9 +194,17 @@ export const Header: React.FC<HeaderProps> = ({
               <Trophy className="w-3.5 h-3.5 text-amber-400" />
               <span>লিডারবোর্ড</span>
             </button>
+            <button 
+              onClick={() => { setCurrentView('tools'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+              className={`hover:text-amber-300 transition flex items-center gap-1 py-1 ${currentView === 'tools' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
+              title="স্মার্ট ফ্রি ক্যালকুলেটর ও টুলস"
+            >
+              <Calculator className="w-3.5 h-3.5 text-amber-400" />
+              <span>ফ্রি টুলস</span>
+            </button>
           </nav>
 
-          {/* RIGHT: Action Buttons (Glass Notification, Glass Cart, Glass Admin Pill, White Login Pill) */}
+          {/* RIGHT: Action Buttons (Glass Notification, Glass Cart, User Profile Dropdown / Login Pill) */}
           <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3">
             {/* 1. Notification Button (Circular Glass Pill) */}
             <button 
@@ -223,39 +229,30 @@ export const Header: React.FC<HeaderProps> = ({
               )}
             </button>
 
-            {/* 3. Admin Button (Glass Pill with Shield Icon & Yellow ADMIN Pill from Reference Image) */}
-            <button 
-              onClick={onOpenAdmin}
-              className={`px-2.5 sm:px-3.5 py-1.5 rounded-full flex items-center gap-1.5 sm:gap-2 transition shadow-md border ${
-                isAdmin
-                  ? 'bg-amber-400 hover:bg-amber-300 text-slate-950 border-amber-300'
-                  : 'bg-emerald-950/70 hover:bg-emerald-900 text-amber-300 border-emerald-500/50 hover:border-amber-400'
-              }`}
-              title="সম্পূর্ণ অ্যাডমিন কন্ট্রোল প্যানেল"
-            >
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
-              <span className="bg-amber-400 text-slate-950 text-[10px] sm:text-[11px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shadow-xs">
-                ADMIN
-              </span>
-            </button>
-
-            {/* 4. Login / User Profile Dropdown Pill */}
+            {/* 3. Login / User Profile Dropdown Pill */}
             {currentUser ? (
               <div className="flex items-center gap-1 sm:gap-1.5">
                 <button
                   onClick={() => {
-                    if (userProfile?.role === 'seller') {
+                    if (isAdmin) {
+                      onOpenAdmin();
+                    } else if (userProfile?.role === 'seller') {
                       setCurrentView('seller-dashboard');
                     } else {
                       setCurrentView('user-dashboard');
                     }
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition active:scale-95 max-w-[110px] sm:max-w-[150px] truncate"
+                  className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition active:scale-95 max-w-[110px] sm:max-w-[160px] truncate"
+                  title={isAdmin ? 'অ্যাডমিন ড্যাশবোর্ড খুলুন' : userProfile?.role === 'seller' ? 'সেলার ড্যাশবোর্ড খুলুন' : 'ইউজার ড্যাশবোর্ড খুলুন'}
                 >
-                  <User className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  {isAdmin ? (
+                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                  ) : (
+                    <User className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
+                  )}
                   <span className="truncate">
-                    {userProfile?.fullName || currentUser.email?.split('@')[0]}
+                    {isAdmin ? 'অ্যাডমিন' : (userProfile?.fullName || currentUser.email?.split('@')[0])}
                   </span>
                   <ChevronDown className="w-3.5 h-3.5 text-slate-600 shrink-0 hidden sm:inline" />
                 </button>
@@ -275,7 +272,6 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => {
                   if (onOpenAuth) onOpenAuth('user-login');
-                  setCurrentView('login');
                 }}
                 className="px-4 sm:px-5 py-1.5 sm:py-2 rounded-full bg-white hover:bg-slate-100 text-slate-950 font-black text-xs sm:text-sm shadow-md flex items-center gap-1 sm:gap-1.5 transition active:scale-95"
               >
@@ -348,13 +344,6 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>মার্কেটপ্লেস</span>
               </button>
               <button 
-                onClick={() => { setCurrentView('all-features'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                className="text-left p-2.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700/50 flex items-center gap-2 text-amber-300"
-              >
-                <Sparkles className="w-4 h-4 text-amber-400" />
-                <span>সব ফিচার হাব</span>
-              </button>
-              <button 
                 onClick={() => { setCurrentView('blog'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="text-left p-2.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700/50 flex items-center gap-2"
               >
@@ -392,6 +381,17 @@ export const Header: React.FC<HeaderProps> = ({
                 <span>লিডারবোর্ড ও ফিডব্যাক</span>
               </button>
               <button 
+                onClick={() => { setCurrentView('tools'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className={`text-left p-2.5 rounded-xl border flex items-center gap-2 ${
+                  currentView === 'tools'
+                    ? 'bg-amber-400 text-slate-950 font-black border-amber-500'
+                    : 'bg-emerald-900/60 hover:bg-emerald-800 border-emerald-700/50 text-white'
+                }`}
+              >
+                <Calculator className={`w-4 h-4 ${currentView === 'tools' ? 'text-slate-950' : 'text-amber-400'}`} />
+                <span>ফ্রি টুলস ও ক্যালকুলেটর</span>
+              </button>
+              <button 
                 onClick={() => { setCurrentView('faq'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
                 className="text-left p-2.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700/50 flex items-center gap-2"
               >
@@ -416,35 +416,47 @@ export const Header: React.FC<HeaderProps> = ({
 
             {/* Dashboards & Account in Mobile */}
             <div className="space-y-2 pt-1">
-              <button 
-                onClick={() => { setCurrentView('seller-dashboard'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                className="w-full text-left p-2.5 rounded-xl bg-emerald-900/40 hover:bg-emerald-800 border border-emerald-700/50 flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <Briefcase className="w-4 h-4 text-amber-400" />
-                  <span>সেলার ড্যাশবোর্ড ও বই আপলোড</span>
-                </span>
-                <ArrowRight className="w-4 h-4 text-emerald-400" />
-              </button>
-              <button 
-                onClick={() => { setCurrentView('user-dashboard'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
-                className="w-full text-left p-2.5 rounded-xl bg-emerald-900/40 hover:bg-emerald-800 border border-emerald-700/50 flex items-center justify-between"
-              >
-                <span className="flex items-center gap-2">
-                  <User className="w-4 h-4 text-emerald-400" />
-                  <span>ইউজার ড্যাশবোর্ড ও আমার লাইব্রেরি</span>
-                </span>
-                <ArrowRight className="w-4 h-4 text-emerald-400" />
-              </button>
+              {userProfile?.role === 'seller' && (
+                <button 
+                  onClick={() => { setCurrentView('seller-dashboard'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="w-full text-left p-2.5 rounded-xl bg-emerald-900/40 hover:bg-emerald-800 border border-emerald-700/50 flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <Briefcase className="w-4 h-4 text-amber-400" />
+                    <span>সেলার ড্যাশবোর্ড ও বই আপলোড</span>
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-emerald-400" />
+                </button>
+              )}
+              {currentUser && userProfile?.role !== 'seller' && !isAdmin && (
+                <button 
+                  onClick={() => { setCurrentView('user-dashboard'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                  className="w-full text-left p-2.5 rounded-xl bg-emerald-900/40 hover:bg-emerald-800 border border-emerald-700/50 flex items-center justify-between"
+                >
+                  <span className="flex items-center gap-2">
+                    <User className="w-4 h-4 text-emerald-400" />
+                    <span>ইউজার ড্যাশবোর্ড ও আমার লাইব্রেরি</span>
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-emerald-400" />
+                </button>
+              )}
 
-              {currentUser && (
+              {currentUser ? (
                 <div className="pt-2 border-t border-emerald-800/60 flex items-center justify-between gap-3">
-                  <div className="truncate text-xs">
+                  <div 
+                    onClick={() => {
+                      if (isAdmin) {
+                        onOpenAdmin();
+                        setMobileMenuOpen(false);
+                      }
+                    }}
+                    className={`truncate text-xs ${isAdmin ? 'cursor-pointer hover:opacity-90' : ''}`}
+                  >
                     <span className="text-emerald-300 font-bold block truncate">
-                      {userProfile?.fullName || currentUser.email?.split('@')[0]}
+                      {isAdmin ? 'অ্যাডমিন' : (userProfile?.fullName || currentUser.email?.split('@')[0])}
                     </span>
                     <span className="text-[10px] text-emerald-200 uppercase font-mono">
-                      {userProfile?.role === 'seller' ? '👑 Seller Account' : '👤 User Account'}
+                      {isAdmin ? '🛡️ Admin Account' : userProfile?.role === 'seller' ? '👑 Seller Account' : '👤 User Account'}
                     </span>
                   </div>
                   <button
@@ -458,6 +470,19 @@ export const Header: React.FC<HeaderProps> = ({
                   >
                     <LogOut className="w-3.5 h-3.5" />
                     <span>লগআউট</span>
+                  </button>
+                </div>
+              ) : (
+                <div className="pt-2 border-t border-emerald-800/60">
+                  <button
+                    onClick={() => {
+                      setMobileMenuOpen(false);
+                      if (onOpenAuth) onOpenAuth('user-login');
+                    }}
+                    className="w-full py-2.5 rounded-xl bg-white hover:bg-slate-100 text-slate-950 font-black text-sm flex items-center justify-center gap-2 transition shadow-md"
+                  >
+                    <User className="w-4 h-4 text-emerald-700" />
+                    <span>লগইন / সাইন-আপ</span>
                   </button>
                 </div>
               )}

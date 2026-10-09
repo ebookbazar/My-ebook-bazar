@@ -6,9 +6,11 @@ import {
   FileText, 
   ChevronRight,
   MessageCircle,
-  HelpCircle
+  HelpCircle,
+  Trophy
 } from 'lucide-react';
 import { db, ref, onValue } from '../firebase';
+import { useAuth } from '../context/AuthContext';
 
 interface FooterProps {
   setCurrentView: (view: string) => void;
@@ -31,6 +33,7 @@ export const Footer: React.FC<FooterProps> = ({
   onOpenTerms, 
   onOpenPrivacy 
 }) => {
+  const { currentUser, userProfile, isAdmin } = useAuth();
   const [footerLinks, setFooterLinks] = useState<FooterLinks>({
     termsUrl: '',
     privacyUrl: '',
@@ -143,15 +146,6 @@ export const Footer: React.FC<FooterProps> = ({
             <ul className="space-y-2.5 text-xs sm:text-sm">
               <li>
                 <button 
-                  onClick={() => { setCurrentView('all-features'); scrollToTop(); }}
-                  className="text-amber-300 hover:text-white transition flex items-center gap-2 py-0.5 font-black text-left group"
-                >
-                  <span className="text-amber-400 group-hover:scale-110 transition-transform">★</span>
-                  <span>সব ফিচার হাব (Admin, Seller, User)</span>
-                </button>
-              </li>
-              <li>
-                <button 
                   onClick={() => { setCurrentView('home'); scrollToTop(); }}
                   className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group"
                 >
@@ -159,24 +153,28 @@ export const Footer: React.FC<FooterProps> = ({
                   <span>ই-বুক মার্কেটপ্লেস</span>
                 </button>
               </li>
-              <li>
-                <button 
-                  onClick={() => { setCurrentView('seller-dashboard'); scrollToTop(); }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group"
-                >
-                  <span className="text-amber-400 group-hover:scale-110 transition-transform">★</span>
-                  <span>সেলার প্যানেল</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => { setCurrentView('user-dashboard'); scrollToTop(); }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group"
-                >
-                  <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform">➜</span>
-                  <span>ইউজার ড্যাশবোর্ড</span>
-                </button>
-              </li>
+              {userProfile?.role === 'seller' && (
+                <li>
+                  <button 
+                    onClick={() => { setCurrentView('seller-dashboard'); scrollToTop(); }}
+                    className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group"
+                  >
+                    <span className="text-amber-400 group-hover:scale-110 transition-transform">★</span>
+                    <span>সেলার প্যানেল</span>
+                  </button>
+                </li>
+              )}
+              {currentUser && userProfile?.role !== 'seller' && !isAdmin && (
+                <li>
+                  <button 
+                    onClick={() => { setCurrentView('user-dashboard'); scrollToTop(); }}
+                    className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group"
+                  >
+                    <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform">➜</span>
+                    <span>ইউজার ড্যাশবোর্ড</span>
+                  </button>
+                </li>
+              )}
               <li>
                 <button 
                   onClick={() => { setCurrentView('blog'); scrollToTop(); }}
@@ -184,6 +182,15 @@ export const Footer: React.FC<FooterProps> = ({
                 >
                   <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform">➜</span>
                   <span>বই ও ব্লগ</span>
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => { setCurrentView('tools'); scrollToTop(); }}
+                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group"
+                >
+                  <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform">➜</span>
+                  <span>ফ্রি টুলস ও ক্যালকুলেটর</span>
                 </button>
               </li>
               <li>
@@ -202,6 +209,21 @@ export const Footer: React.FC<FooterProps> = ({
                 >
                   <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform">➜</span>
                   <span>সেলার মেম্বারশিপ</span>
+                </button>
+              </li>
+              <li>
+                <button 
+                  onClick={() => { 
+                    setCurrentView('home'); 
+                    setTimeout(() => {
+                      const el = document.getElementById('leaderboard');
+                      if (el) el.scrollIntoView({ behavior: 'smooth' });
+                    }, 100);
+                  }}
+                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group"
+                >
+                  <Trophy className="w-3.5 h-3.5 text-amber-400" />
+                  <span>লিডারবোর্ড</span>
                 </button>
               </li>
             </ul>
