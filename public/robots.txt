@@ -3,4 +3,4 @@ Allow: /
 Allow: /blog
 Allow: /blog/*
 
-Sitemap: https://suma47083-maker.github.io/My-ebook-bazar/sitemap.xml
+Sitemap: https://ebookbazar.github.io/My-ebook-bazar/sitemap.xml

@@ -2,7 +2,7 @@
   "name": "react-example",
   "private": true,
   "version": "0.0.0",
-  "homepage": "https://suma47083-maker.github.io/My-ebook-bazar/",
+  "homepage": "https://ebookbazar.github.io/My-ebook-bazar/",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",

@@ -74,7 +74,14 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
   const [paymentMobile, setPaymentMobile] = useState('');
   const [trxId, setTrxId] = useState('');
   const [referralCode, setReferralCode] = useState(() => {
-    return localStorage.getItem('ebookbazar_pending_ref') || '';
+    try {
+      if (typeof window !== 'undefined' && window.localStorage) {
+        return window.localStorage.getItem('ebookbazar_pending_ref') || '';
+      }
+    } catch {
+      // Private mode or storage unavailable
+    }
+    return '';
   });
   const [submitting, setSubmitting] = useState(false);
   const [copiedNumber, setCopiedNumber] = useState(false);

@@ -605,10 +605,14 @@ function MainApp() {
 
   // Capture referral code from URL query (?ref=CODE) and persist
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const refCode = urlParams.get('ref');
-    if (refCode) {
-      localStorage.setItem('ebookbazar_pending_ref', refCode.trim().toUpperCase());
+    try {
+      const urlParams = new URLSearchParams(window.location.search);
+      const refCode = urlParams.get('ref');
+      if (refCode && typeof window !== 'undefined' && window.localStorage) {
+        window.localStorage.setItem('ebookbazar_pending_ref', refCode.trim().toUpperCase());
+      }
+    } catch {
+      // Private mode or storage unavailable
     }
   }, []);
 

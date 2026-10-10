@@ -46,6 +46,28 @@ const playAlertSound = () => {
   }
 };
 
+// Safe sessionStorage access for Private/Incognito modes
+function safeGetSessionItem(key: string): string | null {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      return window.sessionStorage.getItem(key);
+    }
+  } catch {
+    // Incognito or restricted storage
+  }
+  return null;
+}
+
+function safeSetSessionItem(key: string, value: string): void {
+  try {
+    if (typeof window !== 'undefined' && window.sessionStorage) {
+      window.sessionStorage.setItem(key, value);
+    }
+  } catch {
+    // Incognito or restricted storage
+  }
+}
+
 export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({ sellerOnlineCount = 7 }) => {
   const { currentUser, userProfile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
@@ -58,10 +80,10 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({ sellerOnlineCoun
 
   // Chat session key
   const [chatSessionId] = useState<string>(() => {
-    const existing = sessionStorage.getItem('ebookbazar_chat_session');
+    const existing = safeGetSessionItem('ebookbazar_chat_session');
     if (existing) return existing;
     const newId = 'chat_' + Math.random().toString(36).substring(2, 9);
-    sessionStorage.setItem('ebookbazar_chat_session', newId);
+    safeSetSessionItem('ebookbazar_chat_session', newId);
     return newId;
   });
 
@@ -81,7 +103,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({ sellerOnlineCoun
 
     // Show "Can I help you?" alert popup after 3 seconds on first load
     const timer = setTimeout(() => {
-      const dismissed = sessionStorage.getItem('live_chat_alert_dismissed');
+      const dismissed = safeGetSessionItem('live_chat_alert_dismissed');
       if (!dismissed) {
         setShowAlert(true);
         if (soundEnabled) {
@@ -126,14 +148,14 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({ sellerOnlineCoun
   const handleDismissAlert = (e: React.MouseEvent) => {
     e.stopPropagation();
     setShowAlert(false);
-    sessionStorage.setItem('live_chat_alert_dismissed', 'true');
+    safeSetSessionItem('live_chat_alert_dismissed', 'true');
   };
 
   const handleOpenChat = () => {
     setIsOpen(true);
     setShowAlert(false);
     setHasNewAlert(false);
-    sessionStorage.setItem('live_chat_alert_dismissed', 'true');
+    safeSetSessionItem('live_chat_alert_dismissed', 'true');
   };
 
   const handleSendMessage = async (textToSend?: string) => {

@@ -4,19 +4,20 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>eBookBazar – ডিজিটাল বই মার্কেটপ্লেস ও লার্নিং হাব</title>
-    <link rel="icon" type="image/jpeg" href="/ebookbazar-logo.jpg" />
+    <link rel="icon" type="image/jpeg" href="ebookbazar-logo.jpg" />
     <meta name="description" content="eBookBazar: বাংলা ই-বুক মার্কেটপ্লেস, ডিজিটাল পাবলিশিং, ক্যারিয়ার গাইড, অ্যাফিলিয়েট ও সেলার প্ল্যাটফর্ম।" />
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
-    <link rel="canonical" href="https://suma47083-maker.github.io/My-ebook-bazar/" />
+    <link rel="canonical" href="https://ebookbazar.github.io/My-ebook-bazar/" />
     <meta property="og:site_name" content="eBookBazar" />
     <meta property="og:title" content="eBookBazar – ডিজিটাল বই মার্কেটপ্লেস ও লার্নিং হাব" />
     <meta property="og:description" content="eBookBazar: বাংলা ই-বুক মার্কেটপ্লেস, ডিজিটাল পাবলিশিং, ক্যারিয়ার গাইড, অ্যাফিলিয়েট ও সেলার প্ল্যাটফর্ম।" />
     <meta property="og:type" content="website" />
-    <meta property="og:image" content="/ebookbazar-logo.jpg" />
+    <meta property="og:url" content="https://ebookbazar.github.io/My-ebook-bazar/" />
+    <meta property="og:image" content="https://ebookbazar.github.io/My-ebook-bazar/ebookbazar-logo.jpg" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content="eBookBazar – ডিজিটাল বই মার্কেটপ্লেস ও লার্নিং হাব" />
     <meta name="twitter:description" content="eBookBazar: বাংলা ই-বুক মার্কেটপ্লেস, ডিজিটাল পাবলিশিং, ক্যারিয়ার গাইড, অ্যাফিলিয়েট ও সেলার প্ল্যাটফর্ম।" />
-    <meta name="twitter:image" content="/ebookbazar-logo.jpg" />
+    <meta name="twitter:image" content="https://ebookbazar.github.io/My-ebook-bazar/ebookbazar-logo.jpg" />
     <!-- GitHub Pages Single Page App Redirect Script -->
     <script type="text/javascript">
       (function(l) {
@@ -24,8 +25,10 @@
           var decoded = l.search.slice(1).split('&').map(function(s) { 
             return s.replace(/~and~/g, '&')
           }).join('?');
+          var basePath = l.pathname.endsWith('/') ? l.pathname.slice(0, -1) : l.pathname;
+          var cleanPath = decoded.startsWith('/') ? decoded : ('/' + decoded);
           window.history.replaceState(null, null,
-              l.pathname.slice(0, -1) + decoded + l.hash
+              basePath + cleanPath + l.hash
           );
         }
       }(window.location))
