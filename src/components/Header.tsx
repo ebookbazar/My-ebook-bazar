@@ -103,24 +103,27 @@ export const Header: React.FC<HeaderProps> = ({
           >
             {/* Official Logo with Golden Crest */}
             <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-500 shadow-md group-hover:scale-105 transition-transform duration-200 shrink-0">
-              <img 
-                src={`${import.meta.env.BASE_URL || '/'}ebookbazar-logo.jpg`} 
-                alt="eBookBazar Official Logo" 
-                width={44}
-                height={44}
-                decoding="async"
-                className="w-full h-full rounded-full object-cover"
-                referrerPolicy="no-referrer"
-                onError={(e) => {
-                  // Fallback in case image fails to load
-                  const target = e.currentTarget;
-                  target.style.display = 'none';
-                  if (target.parentElement) {
-                    target.parentElement.classList.add('flex', 'items-center', 'justify-center', 'bg-emerald-900');
-                    target.parentElement.innerHTML = `<span class="text-amber-400 font-black text-sm">EB</span>`;
-                  }
-                }}
-              />
+              <picture>
+                <source srcSet={`${import.meta.env.BASE_URL || '/'}ebookbazar-logo.webp`} type="image/webp" />
+                <img 
+                  src={`${import.meta.env.BASE_URL || '/'}ebookbazar-logo.jpg`} 
+                  alt="eBookBazar Official Logo" 
+                  width={44}
+                  height={44}
+                  decoding="async"
+                  className="w-full h-full rounded-full object-cover"
+                  referrerPolicy="no-referrer"
+                  onError={(e) => {
+                    // Fallback in case image fails to load
+                    const target = e.currentTarget;
+                    target.style.display = 'none';
+                    if (target.parentElement) {
+                      target.parentElement.classList.add('flex', 'items-center', 'justify-center', 'bg-emerald-900');
+                      target.parentElement.innerHTML = `<span class="text-amber-400 font-black text-sm">EB</span>`;
+                    }
+                  }}
+                />
+              </picture>
             </div>
 
             {/* Brand Title */}

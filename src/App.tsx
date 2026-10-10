@@ -30,10 +30,10 @@ import { ImageSlideshow } from './components/ImageSlideshow';
 import { HomeFeatureCards } from './components/HomeFeatureCards';
 import { RealWebsiteStats } from './components/RealWebsiteStats';
 import { CuratedPicksSection } from './components/CuratedPicksSection';
-import { LeaderboardSection } from './components/LeaderboardSection';
 import { AppDownloadBanner } from './components/AppDownloadBanner';
 
 // Dynamic lazy-loaded views, widgets & heavy modals for lightning-fast initial page load
+const LeaderboardSection = lazy(() => import('./components/LeaderboardSection').then(m => ({ default: m.LeaderboardSection })));
 const EbookDetailModal = lazy(() => import('./components/EbookDetailModal').then(m => ({ default: m.EbookDetailModal })));
 const CartModal = lazy(() => import('./components/CartModal').then(m => ({ default: m.CartModal })));
 const AuthModal = lazy(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })));
@@ -201,6 +201,16 @@ function MainApp() {
 
   // App Download Settings from Realtime Database
   const [appDownloadSettings, setAppDownloadSettings] = useState<AppDownloadSettings>(DEFAULT_APP_DOWNLOAD_SETTINGS);
+
+  // Defer non-critical floating widgets (LiveChat, QuickSearch) slightly so initial FCP/LCP have 100% network bandwidth
+  const [deferredWidgetsReady, setDeferredWidgetsReady] = useState(false);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDeferredWidgetsReady(true);
+    }, 2000);
+    return () => clearTimeout(timer);
+  }, []);
 
   // Listen to Realtime counts of users and sellers from public _platformStats
   useEffect(() => {
@@ -903,13 +913,15 @@ function MainApp() {
               )}
             </div>
 
-            {/* 7.5. 🏆 Leaderboard + Community Feedback Section */}
-            <LeaderboardSection
-              onOpenAuthModal={(mode) => {
-                setAuthInitialMode(mode || 'user-login');
-                setIsAuthOpen(true);
-              }}
-            />
+            {/* 7.5. 🏆 Leaderboard + Community Feedback Section (Dynamically loaded to minimize initial JS payload) */}
+            <Suspense fallback={<div className="h-48 rounded-3xl bg-slate-50 border border-slate-200/50 animate-pulse my-6" />}>
+              <LeaderboardSection
+                onOpenAuthModal={(mode) => {
+                  setAuthInitialMode(mode || 'user-login');
+                  setIsAuthOpen(true);
+                }}
+              />
+            </Suspense>
 
             {/* 8. সর্বশেষ লেখা (Featured Real Blog Posts Section on Home, exactly 3 latest articles) */}
             <div className="pt-8 border-t border-slate-200 space-y-6">
@@ -969,6 +981,9 @@ function MainApp() {
                           <img 
                             src={post.coverImage} 
                             alt={post.imageAlt || post.title}
+                            width={400}
+                            height={250}
+                            decoding="async"
                             className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
                             loading="lazy"
                           />
@@ -1468,22 +1483,26 @@ function MainApp() {
         )}
       </main>
 
-      {/* Floating Quick Search (Search across real eBooks & Blogs) */}
-      <Suspense fallback={null}>
-        <FloatingSearch
-          ebooks={ebooks}
-          blogPosts={displayedBlogPosts}
-          onSelectEbook={(b) => setSelectedEbook(b)}
-          onSelectBlogPost={(p) => {
-            handleOpenBlog(p);
-          }}
-        />
-      </Suspense>
+      {/* Floating Quick Search (Search across real eBooks & Blogs) - deferred to prioritize initial mobile paint */}
+      {deferredWidgetsReady && (
+        <Suspense fallback={null}>
+          <FloatingSearch
+            ebooks={ebooks}
+            blogPosts={displayedBlogPosts}
+            onSelectEbook={(b) => setSelectedEbook(b)}
+            onSelectBlogPost={(p) => {
+              handleOpenBlog(p);
+            }}
+          />
+        </Suspense>
+      )}
 
-      {/* Floating Live Chat & Customer Support Widget ("Can I help you?") */}
-      <Suspense fallback={null}>
-        <LiveChatWidget sellerOnlineCount={totalSellersCount} />
-      </Suspense>
+      {/* Floating Live Chat & Customer Support Widget ("Can I help you?") - deferred to prioritize initial mobile paint */}
+      {deferredWidgetsReady && (
+        <Suspense fallback={null}>
+          <LiveChatWidget sellerOnlineCount={totalSellersCount} />
+        </Suspense>
+      )}
 
       {/* Universal Footer */}
       <Footer 

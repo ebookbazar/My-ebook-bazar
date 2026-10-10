@@ -4,6 +4,7 @@ import { ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 export interface SlideItem {
   id: number;
   src: string;
+  mobileSrc: string;
   alt: string;
 }
 
@@ -16,26 +17,31 @@ const SLIDES: SlideItem[] = [
   {
     id: 1,
     src: getSlideSrc('slide-1.webp'),
+    mobileSrc: getSlideSrc('slide-1-mobile.webp'),
     alt: 'শৈশবে ফিরে যাওয়া — গ্রামের বর্ষায় উঠানে বৃষ্টির পানিতে শিশুর আনন্দ ও হারিকেনের আলোয় শান্ত পড়াশোনা'
   },
   {
     id: 2,
     src: getSlideSrc('slide-2.webp'),
+    mobileSrc: getSlideSrc('slide-2-mobile.webp'),
     alt: 'শীতের সকালে মায়ের ডাক — শীতের কুয়াশায় পিঠার সুবাস ও গ্রামের উঠানের শৈশবের স্মৃতি'
   },
   {
     id: 3,
     src: getSlideSrc('slide-3.webp'),
+    mobileSrc: getSlideSrc('slide-3-mobile.webp'),
     alt: 'গ্রামের পাকা ব্রিজে বন্ধুদের আড্ডা — চায়ের কাপে গল্প, মাঠে ফুটবল ও সোনালী বিকেল'
   },
   {
     id: 4,
     src: getSlideSrc('slide-4.webp'),
+    mobileSrc: getSlideSrc('slide-4-mobile.webp'),
     alt: 'একটি চিঠি বদলে দিতে পারে একটি পরিবার — অপেক্ষার শেষে সুখবর ও পারিবারিক আনন্দ'
   },
   {
     id: 5,
     src: getSlideSrc('slide-5.webp'),
+    mobileSrc: getSlideSrc('slide-5-mobile.webp'),
     alt: 'গ্রাম থেকেই শুরু হোক স্বপ্নের ব্যবসা — অনলাইনে ব্যবসা ও নারীদের স্বাবলম্বী হওয়ার আনন্দ'
   }
 ];
@@ -43,6 +49,8 @@ const SLIDES: SlideItem[] = [
 export const ImageSlideshow: React.FC = () => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isPaused, setIsPaused] = useState(false);
+  // Prioritize LCP by loading only Slide 1 on initial paint; defer remaining slides
+  const [loadedSlideIds, setLoadedSlideIds] = useState<Set<number>>(() => new Set([1]));
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
   const [touchEndX, setTouchEndX] = useState<number | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -53,6 +61,27 @@ export const ImageSlideshow: React.FC = () => {
     const bnDigits = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
     return num.toString().replace(/\d/g, (d) => bnDigits[parseInt(d, 10)]);
   };
+
+  // Preload next slide when current slide changes
+  useEffect(() => {
+    setLoadedSlideIds((prev) => {
+      const currentId = SLIDES[currentIndex].id;
+      const nextId = SLIDES[(currentIndex + 1) % SLIDES.length].id;
+      if (prev.has(currentId) && prev.has(nextId)) return prev;
+      const updated = new Set(prev);
+      updated.add(currentId);
+      updated.add(nextId);
+      return updated;
+    });
+  }, [currentIndex]);
+
+  // After initial render completes, prefetch all remaining slides in background
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setLoadedSlideIds(new Set(SLIDES.map((s) => s.id)));
+    }, 2500);
+    return () => clearTimeout(timer);
+  }, []);
 
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % SLIDES.length);
@@ -140,6 +169,7 @@ export const ImageSlideshow: React.FC = () => {
           {/* Slides: Unobstructed Images with exact 16:9 ratio & subtle slow zoom */}
           {SLIDES.map((slide, idx) => {
             const isActive = idx === currentIndex;
+            const shouldRender = loadedSlideIds.has(slide.id);
             return (
               <div
                 key={slide.id}
@@ -148,19 +178,23 @@ export const ImageSlideshow: React.FC = () => {
                   isActive ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'
                 }`}
               >
-                <img
-                  src={slide.src}
-                  alt={slide.alt}
-                  width={1152}
-                  height={648}
-                  referrerPolicy="no-referrer"
-                  loading={idx === 0 ? 'eager' : 'lazy'}
-                  decoding={idx === 0 ? 'sync' : 'async'}
-                  fetchPriority={idx === 0 ? 'high' : 'low'}
-                  className={`w-full h-full object-cover object-center transform transition-transform duration-[7000ms] ease-out will-change-transform ${
-                    isActive ? 'scale-[1.03]' : 'scale-100'
-                  }`}
-                />
+                {shouldRender && (
+                  <img
+                    src={slide.src}
+                    srcSet={`${slide.mobileSrc} 640w, ${slide.src} 1200w`}
+                    sizes="(max-width: 640px) 100vw, 1152px"
+                    alt={slide.alt}
+                    width={1152}
+                    height={648}
+                    referrerPolicy="no-referrer"
+                    loading={idx === 0 ? 'eager' : 'lazy'}
+                    decoding={idx === 0 ? 'sync' : 'async'}
+                    fetchPriority={idx === 0 ? 'high' : 'low'}
+                    className={`w-full h-full object-cover object-center transform transition-transform duration-[7000ms] ease-out will-change-transform ${
+                      isActive ? 'scale-[1.03]' : 'scale-100'
+                    }`}
+                  />
+                )}
               </div>
             );
           })}
