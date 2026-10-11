@@ -44,7 +44,6 @@ import {
   LogIn,
   Home,
   Star,
-  Trophy,
   CornerDownRight,
   Calculator
 } from 'lucide-react';
@@ -74,10 +73,6 @@ import {
   AppDownloadStats,
   EbookRating,
   EbookRatingSummary,
-  LeaderboardPost,
-  LeaderboardRole,
-  LeaderboardPostType,
-  AdminReply,
   BlogPost
 } from '../types';
 import { useAuth } from '../context/AuthContext';
@@ -89,13 +84,6 @@ import {
   deleteEbookRating, 
   getLocalRatingSummaries 
 } from '../services/ratingService';
-import { 
-  subscribeToAllLeaderboardPosts, 
-  updateLeaderboardStatus, 
-  deleteLeaderboardPost, 
-  saveAdminReply, 
-  deleteAdminReply 
-} from '../services/leaderboardService';
 
 const TICKET_CATEGORIES: TicketCategory[] = [
   'পেমেন্ট ও রিফান্ড',
@@ -173,7 +161,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setMembershipRequests({});
       setAffiliateTransactions({});
       setTickets({});
-      setLeaderboardPosts([]);
       setLoginEmail('');
       setLoginPassword('');
       showToast('info', 'অ্যাডমিন অ্যাকাউন্ট থেকে লগআউট সম্পন্ন হয়েছে।');
@@ -234,7 +221,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Tabs
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'users' | 'sellers' | 'ebooks' | 'orders' | 'memberships' | 'withdrawals' | 'settings' | 'notifications' | 'affiliates' | 'rules' | 'xml' | 'tickets' | 'app-download' | 'leaderboard' | 'tools'
+    'overview' | 'users' | 'sellers' | 'ebooks' | 'orders' | 'memberships' | 'withdrawals' | 'settings' | 'notifications' | 'affiliates' | 'rules' | 'xml' | 'tickets' | 'app-download' | 'tools'
   >('overview');
 
   // Synchronize active tab from URL route if specified (e.g. /admin/orders, /admin/users)
@@ -253,7 +240,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       else if (path.includes('rules')) setActiveTab('rules');
       else if (path.includes('tickets')) setActiveTab('tickets');
       else if (path.includes('app-download')) setActiveTab('app-download');
-      else if (path.includes('leaderboard')) setActiveTab('leaderboard');
       else if (path.includes('tools')) setActiveTab('tools');
     }
   }, []);
@@ -353,23 +339,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     });
     return () => unsub();
   }, [managingReviewsBook?.id]);
-
-  // Leaderboard Posts Management State
-  const [leaderboardPosts, setLeaderboardPosts] = useState<LeaderboardPost[]>([]);
-  const [selectedLeaderboardFilter, setSelectedLeaderboardFilter] = useState<'all' | 'pending' | 'approved' | 'rejected'>('all');
-  const [replyingPost, setReplyingPost] = useState<LeaderboardPost | null>(null);
-  const [replyInputText, setReplyInputText] = useState<string>('');
-  const [savingReply, setSavingReply] = useState<boolean>(false);
-  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
-
-  useEffect(() => {
-    const unsub = subscribeToAllLeaderboardPosts((postsList) => {
-      setLeaderboardPosts(postsList);
-    });
-    return () => unsub();
-  }, []);
-
-  const pendingLeaderboardCount = leaderboardPosts.filter(p => p.status === 'pending').length;
 
   // Direct Withdrawal Processing State (No modal/popup)
   const [processingWithdrawId, setProcessingWithdrawId] = useState<string | null>(null);
@@ -2307,21 +2276,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           </button>
 
           <button
-            onClick={() => setActiveTab('leaderboard')}
-            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap relative ${
-              activeTab === 'leaderboard' ? 'bg-[#15803d] text-white shadow ring-2 ring-amber-400' : 'text-slate-300 hover:bg-slate-800'
-            }`}
-          >
-            <Trophy className="w-4 h-4 text-amber-400" />
-            <span>লিডারবোর্ড পোস্ট (Leaderboard)</span>
-            {pendingLeaderboardCount > 0 && (
-              <span className="bg-amber-400 text-slate-950 text-[10px] px-1.5 py-0.2 rounded-full font-black animate-pulse">
-                {pendingLeaderboardCount}
-              </span>
-            )}
-          </button>
-
-          <button
             onClick={() => setActiveTab('users')}
             className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
               activeTab === 'users' ? 'bg-[#15803d] text-white shadow' : 'text-slate-300 hover:bg-slate-800'
@@ -2571,27 +2525,6 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     আজকে: {appDownloadMetrics.todayClicks}টি | এই মাসে: {appDownloadMetrics.thisMonthClicks}টি
-                  </p>
-                </div>
-
-                <div 
-                  onClick={() => setActiveTab('leaderboard')}
-                  className="bg-white p-5 rounded-2xl border-2 border-emerald-600/70 hover:border-emerald-700 shadow-sm cursor-pointer hover:shadow-md transition group"
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
-                      <Trophy className="w-3.5 h-3.5 text-amber-500 fill-amber-400" />
-                      <span>লিডারবোর্ড ও ফিডব্যাক</span>
-                    </span>
-                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
-                      ম্যানেজ
-                    </span>
-                  </div>
-                  <p className="text-3xl font-black text-slate-900 mt-1 group-hover:scale-105 transition-transform">
-                    {leaderboardPosts.length}
-                  </p>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    অপেক্ষমান: <span className="font-bold text-amber-600">{pendingLeaderboardCount}</span> | লাইভ: {leaderboardPosts.filter(p => p.status === 'approved').length}
                   </p>
                 </div>
               </div>
@@ -4910,230 +4843,6 @@ service cloud.firestore {
             </div>
           )}
 
-          {/* TAB: LEADERBOARD POSTS MANAGEMENT */}
-          {activeTab === 'leaderboard' && (
-            <div className="space-y-6">
-              {/* Header & KPI Summary */}
-              <div className="bg-gradient-to-r from-emerald-950 via-teal-950 to-slate-900 rounded-3xl p-6 text-white border border-emerald-600/40 shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="space-y-1.5">
-                  <div className="inline-flex items-center gap-2 bg-emerald-800/80 border border-emerald-500/50 text-emerald-200 text-xs font-black px-3 py-1 rounded-full uppercase tracking-wider">
-                    <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                    <span>Leaderboard & Community Feedback System</span>
-                  </div>
-                  <h3 className="text-2xl font-black text-white">
-                    লিডারবোর্ড পোস্ট ও <span className="text-amber-400">ফিডব্যাক ম্যানেজমেন্ট</span>
-                  </h3>
-                  <p className="text-xs text-emerald-100/90 max-w-xl">
-                    ইউজার, সেলার ও বায়ারদের বাস্তব মতামত যাচাই, অনুমোদন, বাতিল, মুছে ফেলা এবং অ্যাডমিন রিপ্লাই প্রদান করুন। শুধুমাত্র অনুমোদিত পোস্ট হোমপেজ লিডারবোর্ডে প্রদর্শিত হবে।
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 w-full md:w-auto shrink-0">
-                  <div className="bg-white/10 backdrop-blur-md rounded-2xl p-3 border border-white/15 text-center">
-                    <span className="text-[10px] uppercase font-bold text-slate-200 block">মোট পোস্ট</span>
-                    <span className="text-2xl font-black text-white">{leaderboardPosts.length}</span>
-                  </div>
-                  <div className="bg-amber-500/20 backdrop-blur-md rounded-2xl p-3 border border-amber-400/30 text-center">
-                    <span className="text-[10px] uppercase font-bold text-amber-300 block">অপেক্ষমান</span>
-                    <span className="text-2xl font-black text-amber-400">{pendingLeaderboardCount}</span>
-                  </div>
-                  <div className="bg-emerald-500/20 backdrop-blur-md rounded-2xl p-3 border border-emerald-400/30 text-center">
-                    <span className="text-[10px] uppercase font-bold text-emerald-300 block">অনুমোদিত (Live)</span>
-                    <span className="text-2xl font-black text-emerald-400">
-                      {leaderboardPosts.filter(p => p.status === 'approved').length}
-                    </span>
-                  </div>
-                  <div className="bg-rose-500/20 backdrop-blur-md rounded-2xl p-3 border border-rose-400/30 text-center">
-                    <span className="text-[10px] uppercase font-bold text-rose-300 block">বাতিলকৃত</span>
-                    <span className="text-2xl font-black text-rose-400">
-                      {leaderboardPosts.filter(p => p.status === 'rejected').length}
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Main Card */}
-              <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
-                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 border-b border-slate-100 pb-3">
-                  <div>
-                    <h3 className="font-black text-slate-900 text-base">মতামত ও ফিডব্যাকের তালিকা</h3>
-                    <p className="text-xs text-slate-500">অনুমোদনের পর পোস্টগুলো হোমপেজ লিডারবোর্ডে দৃশ্যমান হবে</p>
-                  </div>
-
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <select
-                      value={selectedLeaderboardFilter}
-                      onChange={(e) => setSelectedLeaderboardFilter(e.target.value as any)}
-                      className="p-2 rounded-xl border border-slate-300 text-xs font-bold bg-white"
-                    >
-                      <option value="all">সকল পোস্ট ({leaderboardPosts.length})</option>
-                      <option value="pending">অপেক্ষমান ({pendingLeaderboardCount})</option>
-                      <option value="approved">অনুমোদিত ({leaderboardPosts.filter(p => p.status === 'approved').length})</option>
-                      <option value="rejected">বাতিলকৃত ({leaderboardPosts.filter(p => p.status === 'rejected').length})</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Table */}
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs text-left">
-                    <thead className="bg-slate-100 text-slate-700 font-black uppercase text-[10px]">
-                      <tr>
-                        <th className="p-3">প্রেরক ও ভূমিকা</th>
-                        <th className="p-3">মতামতের ধরন</th>
-                        <th className="p-3">মন্তব্য (Comment)</th>
-                        <th className="p-3">তারিখ</th>
-                        <th className="p-3">স্ট্যাটাস</th>
-                        <th className="p-3">অ্যাডমিন রিপ্লাই</th>
-                        <th className="p-3 text-right">অ্যাকশন</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 font-medium">
-                      {leaderboardPosts
-                        .filter(p => selectedLeaderboardFilter === 'all' || p.status === selectedLeaderboardFilter)
-                        .map((post) => (
-                          <tr key={post.id} className="hover:bg-slate-50">
-                            <td className="p-3 align-top">
-                              <p className="font-black text-slate-900">{post.name}</p>
-                              <span className={`inline-block mt-0.5 text-[9px] font-black px-1.5 py-0.2 rounded uppercase ${
-                                post.role === 'Seller' 
-                                  ? 'bg-indigo-100 text-indigo-800' 
-                                  : post.role === 'Buyer' 
-                                  ? 'bg-emerald-100 text-emerald-800' 
-                                  : 'bg-blue-100 text-blue-800'
-                              }`}>
-                                {post.role}
-                              </span>
-                            </td>
-
-                            <td className="p-3 align-top whitespace-nowrap">
-                              <span className="font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/80">
-                                {post.postType}
-                              </span>
-                            </td>
-
-                            <td className="p-3 align-top max-w-sm">
-                              <p className="text-slate-700 leading-relaxed whitespace-pre-wrap">
-                                {post.comment}
-                              </p>
-                            </td>
-
-                            <td className="p-3 align-top text-slate-500 whitespace-nowrap">
-                              {new Date(post.createdAt).toLocaleDateString('bn-BD')}
-                            </td>
-
-                            <td className="p-3 align-top whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded-full text-[10px] font-black uppercase ${
-                                post.status === 'approved' 
-                                  ? 'bg-emerald-100 text-emerald-800' 
-                                  : post.status === 'rejected' 
-                                  ? 'bg-rose-100 text-rose-800' 
-                                  : 'bg-amber-100 text-amber-800'
-                              }`}>
-                                {post.status}
-                              </span>
-                            </td>
-
-                            <td className="p-3 align-top max-w-xs">
-                              {post.adminReply ? (
-                                <div className="space-y-1 bg-emerald-50/70 p-2 rounded-xl border border-emerald-200/70 text-[11px]">
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="font-black text-emerald-900 flex items-center gap-1">
-                                      <ShieldCheck className="w-3 h-3 text-emerald-700" />
-                                      <span>রিপ্লাই দেওয়া হয়েছে</span>
-                                    </span>
-                                    <button
-                                      type="button"
-                                      onClick={() => {
-                                        setReplyingPost(post);
-                                        setReplyInputText(post.adminReply?.text || '');
-                                      }}
-                                      className="text-emerald-700 hover:text-emerald-900 font-bold underline"
-                                    >
-                                      এডিট
-                                    </button>
-                                  </div>
-                                  <p className="text-slate-700 italic line-clamp-2">
-                                    "{post.adminReply.text}"
-                                  </p>
-                                </div>
-                              ) : (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setReplyingPost(post);
-                                    setReplyInputText('');
-                                  }}
-                                  className="text-xs font-bold text-emerald-700 hover:text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 px-2.5 py-1 rounded-xl transition flex items-center gap-1"
-                                >
-                                  <MessageSquare className="w-3.5 h-3.5" />
-                                  <span>+ রিপ্লাই দিন</span>
-                                </button>
-                              )}
-                            </td>
-
-                            <td className="p-3 align-top text-right space-x-1.5 whitespace-nowrap">
-                              {post.status !== 'approved' && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    await updateLeaderboardStatus(post.id, 'approved');
-                                    showToast('success', 'পোস্টটি সফলভাবে অনুমোদন করা হয়েছে!');
-                                  }}
-                                  className="bg-emerald-600 hover:bg-emerald-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition active:scale-95 shadow-xs"
-                                >
-                                  অনুমোদন
-                                </button>
-                              )}
-
-                              {post.status !== 'rejected' && (
-                                <button
-                                  type="button"
-                                  onClick={async () => {
-                                    await updateLeaderboardStatus(post.id, 'rejected');
-                                    showToast('success', 'পোস্টটি বাতিল করা হয়েছে!');
-                                  }}
-                                  className="bg-rose-600 hover:bg-rose-700 text-white px-2.5 py-1 rounded-lg text-[10px] font-bold transition active:scale-95 shadow-xs"
-                                >
-                                  বাতিল
-                                </button>
-                              )}
-
-                              <button
-                                type="button"
-                                onClick={async () => {
-                                  if (!window.confirm('আপনি কি নিশ্চিতভাবে এই পোস্টটি স্থায়ীভাবে মুছে ফেলতে চান?')) return;
-                                  setDeletingPostId(post.id);
-                                  try {
-                                    await deleteLeaderboardPost(post.id);
-                                    showToast('success', 'পোস্টটি স্থায়ীভাবে মুছে ফেলা হয়েছে!');
-                                  } finally {
-                                    setDeletingPostId(null);
-                                  }
-                                }}
-                                disabled={deletingPostId === post.id}
-                                className="bg-rose-50 hover:bg-rose-100 text-rose-700 px-2 py-1 rounded-lg text-xs font-bold inline-flex items-center gap-1 transition active:scale-95"
-                                title="মুছে ফেলুন"
-                              >
-                                <Trash2 className="w-3.5 h-3.5 text-rose-600" />
-                                <span>ডিলিট</span>
-                              </button>
-                            </td>
-                          </tr>
-                        ))}
-                    </tbody>
-                  </table>
-                  {leaderboardPosts.length === 0 && (
-                    <div className="py-12 text-center text-slate-400 space-y-1">
-                      <Trophy className="w-10 h-10 mx-auto text-slate-300 stroke-[1.2] mb-1" />
-                      <p className="font-bold text-xs">কোনো লিডারবোর্ড পোস্ট পাওয়া যায়নি</p>
-                    </div>
-                  )}
-                </div>
-              </div>
-            </div>
-          )}
-
         </div>
       </div>
 
@@ -5267,104 +4976,6 @@ service cloud.firestore {
               >
                 বন্ধ করুন
               </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Admin Reply Modal for Leaderboard Post */}
-      {replyingPost && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-700" />
-                <h3 className="text-base font-black text-slate-900">অ্যাডমিন উত্তর (Admin Reply)</h3>
-              </div>
-              <button
-                type="button"
-                onClick={() => setReplyingPost(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 flex items-center justify-center text-slate-600 transition"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-
-            {/* Original Post Details */}
-            <div className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="font-black text-slate-900">{replyingPost.name} ({replyingPost.role})</span>
-                <span className="text-slate-400 font-bold">{replyingPost.postType}</span>
-              </div>
-              <p className="text-slate-700 italic whitespace-pre-wrap">"{replyingPost.comment}"</p>
-            </div>
-
-            {/* Reply Input Form */}
-            <div className="space-y-2">
-              <label className="block text-xs font-bold text-slate-700">
-                অ্যাডমিনের উত্তর (Admin Reply Text):
-              </label>
-              <textarea
-                rows={4}
-                value={replyInputText}
-                onChange={(e) => setReplyInputText(e.target.value)}
-                placeholder="eBookBazar টিমের পক্ষ থেকে গ্রাহককে সদয় ও আশ্বস্তকারী উত্তর লিখুন..."
-                className="w-full text-xs sm:text-sm p-3 rounded-xl border border-slate-300 focus:outline-none focus:ring-2 focus:ring-emerald-600 text-slate-800 leading-relaxed"
-                maxLength={500}
-              />
-            </div>
-
-            {/* Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-slate-100">
-              {replyingPost.adminReply ? (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    if (!window.confirm('আপনি কি পূর্বের অ্যাডমিন রিপ্লাইটি মুছে ফেলতে চান?')) return;
-                    await deleteAdminReply(replyingPost.id);
-                    setReplyingPost(null);
-                    showToast('success', 'অ্যাডমিন রিপ্লাইটি মুছে ফেলা হয়েছে!');
-                  }}
-                  className="text-xs font-bold text-rose-600 hover:text-rose-700 py-2 px-3 rounded-xl hover:bg-rose-50 transition"
-                >
-                  রিপ্লাই মুছুন
-                </button>
-              ) : <div />}
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => setReplyingPost(null)}
-                  className="px-4 py-2 rounded-xl text-xs font-bold text-slate-600 hover:bg-slate-100 transition"
-                >
-                  বাতিল
-                </button>
-                <button
-                  type="button"
-                  disabled={savingReply || !replyInputText.trim()}
-                  onClick={async () => {
-                    setSavingReply(true);
-                    try {
-                      await saveAdminReply({
-                        postId: replyingPost.id,
-                        replyText: replyInputText,
-                        adminId: currentUser?.uid || 'admin',
-                        adminName: userProfile?.fullName || 'eBookBazar Admin'
-                      });
-                      setReplyingPost(null);
-                      showToast('success', 'অ্যাডমিন রিপ্লাই সফলভাবে সংরক্ষিত হয়েছে!');
-                    } catch (err: any) {
-                      showToast('error', err?.message || 'রিপ্লাই সংরক্ষণ ব্যর্থ হয়েছে।');
-                    } finally {
-                      setSavingReply(false);
-                    }
-                  }}
-                  className="bg-[#15803d] hover:bg-emerald-800 disabled:opacity-50 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow transition active:scale-95 flex items-center gap-1.5"
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>{savingReply ? 'সংরক্ষণ হচ্ছে...' : 'রিপ্লাই পাঠান'}</span>
-                </button>
-              </div>
             </div>
           </div>
         </div>

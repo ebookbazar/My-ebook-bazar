@@ -6,8 +6,7 @@ import {
   FileText, 
   ChevronRight,
   MessageCircle,
-  HelpCircle,
-  Trophy
+  HelpCircle
 } from 'lucide-react';
 import { db, ref, onValue } from '../firebase';
 import { useAuth } from '../context/AuthContext';
@@ -216,21 +215,6 @@ export const Footer: React.FC<FooterProps> = ({
                 >
                   <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform">➜</span>
                   <span>সেলার মেম্বারশিপ</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  onClick={() => { 
-                    setCurrentView('home'); 
-                    setTimeout(() => {
-                      const el = document.getElementById('leaderboard');
-                      if (el) el.scrollIntoView({ behavior: 'smooth' });
-                    }, 100);
-                  }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group"
-                >
-                  <Trophy className="w-3.5 h-3.5 text-amber-400" />
-                  <span>লিডারবোর্ড</span>
                 </button>
               </li>
             </ul>

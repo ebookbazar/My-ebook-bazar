@@ -33,7 +33,6 @@ import { CuratedPicksSection } from './components/CuratedPicksSection';
 import { AppDownloadBanner } from './components/AppDownloadBanner';
 
 // Dynamic lazy-loaded views, widgets & heavy modals for lightning-fast initial page load
-const LeaderboardSection = lazy(() => import('./components/LeaderboardSection').then(m => ({ default: m.LeaderboardSection })));
 const EbookDetailModal = lazy(() => import('./components/EbookDetailModal').then(m => ({ default: m.EbookDetailModal })));
 const CartModal = lazy(() => import('./components/CartModal').then(m => ({ default: m.CartModal })));
 const AuthModal = lazy(() => import('./components/AuthModal').then(m => ({ default: m.AuthModal })));
@@ -913,16 +912,6 @@ function MainApp() {
                 </div>
               )}
             </div>
-
-            {/* 7.5. 🏆 Leaderboard + Community Feedback Section (Dynamically loaded to minimize initial JS payload) */}
-            <Suspense fallback={<div className="h-48 rounded-3xl bg-slate-50 border border-slate-200/50 my-6" />}>
-              <LeaderboardSection
-                onOpenAuthModal={(mode) => {
-                  setAuthInitialMode(mode || 'user-login');
-                  setIsAuthOpen(true);
-                }}
-              />
-            </Suspense>
 
             {/* 8. সর্বশেষ লেখা (Featured Real Blog Posts Section on Home, exactly 3 latest articles) */}
             <div className="pt-8 border-t border-slate-200 space-y-6">

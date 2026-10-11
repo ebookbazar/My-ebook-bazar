@@ -352,36 +352,4 @@ export interface AppDownloadStats {
   resetAt?: number;
 }
 
-export type LeaderboardRole = 'User' | 'Seller' | 'Buyer';
-
-export type LeaderboardPostType = 
-  | 'Payment Experience'
-  | 'eBook Purchase Experience'
-  | 'Seller Experience'
-  | 'Problem / Issue'
-  | 'Suggestion'
-  | 'General Feedback';
-
-export interface AdminReply {
-  text: string;
-  adminId: string;
-  adminName: string;
-  createdAt: number;
-  updatedAt?: number;
-}
-
-export interface LeaderboardPost {
-  id: string;
-  userId: string;
-  name: string;
-  role: LeaderboardRole;
-  postType: LeaderboardPostType;
-  comment: string;
-  createdAt: number;
-  status: 'pending' | 'approved' | 'rejected';
-  approvedAt?: number;
-  rejectedAt?: number;
-  adminReply?: AdminReply | null;
-}
-
 
