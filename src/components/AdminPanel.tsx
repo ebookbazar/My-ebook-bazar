@@ -823,7 +823,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       discountPrice: hasDiscount ? saleP : undefined,
       description: newAdminBook.description.trim() || 'অ্যাডমিন অফিশিয়াল ই-বুক',
       shortDesc: newAdminBook.description.trim().slice(0, 120) || 'অ্যাডমিন অফিশিয়াল ই-বুক',
-      coverUrl: newAdminBook.coverUrl.trim() || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop',
+      coverUrl: newAdminBook.coverUrl.trim() || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?w=400&q=70&auto=format&fm=webp&fit=crop',
       pdfUrl: newAdminBook.pdfUrl.trim() || 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf',
       sellerId: 'ADMIN',
       sellerName: 'Admin',

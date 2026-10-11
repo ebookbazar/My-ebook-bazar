@@ -82,6 +82,7 @@ import { INITIAL_EBOOKS } from './data/initialEbooks';
 import { BLOG_POSTS } from './data/blogPosts';
 import { db, ref, onValue, set, update } from './firebase';
 import { subscribeToAllRatingSummaries, getLocalRatingSummaries } from './services/ratingService';
+import { getOptimizedImageUrl } from './utils/imageOptimizer';
 
 const CATEGORIES = [
   'সব বই',
@@ -719,7 +720,7 @@ function MainApp() {
       <main className="flex-1 container mx-auto px-4 max-w-7xl pt-4 space-y-6">
         {/* VIEW 1: HOME MARKETPLACE */}
         {currentView === 'home' && (
-          <div className="space-y-6 md:space-y-8 animate-soft-fade-in">
+          <div className="space-y-6 md:space-y-8">
             {/* Frontend App Download Section (Header-এর ঠিক নিচে ও Homepage-এর মূল কন্টেন্ট শুরুর আগে) */}
             <AppDownloadBanner
               title={appDownloadSettings.appDownloadTitle}
@@ -914,7 +915,7 @@ function MainApp() {
             </div>
 
             {/* 7.5. 🏆 Leaderboard + Community Feedback Section (Dynamically loaded to minimize initial JS payload) */}
-            <Suspense fallback={<div className="h-48 rounded-3xl bg-slate-50 border border-slate-200/50 animate-pulse my-6" />}>
+            <Suspense fallback={<div className="h-48 rounded-3xl bg-slate-50 border border-slate-200/50 my-6" />}>
               <LeaderboardSection
                 onOpenAuthModal={(mode) => {
                   setAuthInitialMode(mode || 'user-login');
@@ -979,7 +980,7 @@ function MainApp() {
                       <div>
                         <div className="aspect-[16/10] overflow-hidden bg-slate-100 relative">
                           <img 
-                            src={post.coverImage} 
+                            src={getOptimizedImageUrl(post.coverImage, { width: 440, height: 275, quality: 72 })} 
                             alt={post.imageAlt || post.title}
                             width={400}
                             height={250}

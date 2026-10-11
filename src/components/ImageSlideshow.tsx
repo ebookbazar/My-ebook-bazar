@@ -75,14 +75,6 @@ export const ImageSlideshow: React.FC = () => {
     });
   }, [currentIndex]);
 
-  // After initial render completes, prefetch all remaining slides in background
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setLoadedSlideIds(new Set(SLIDES.map((s) => s.id)));
-    }, 2500);
-    return () => clearTimeout(timer);
-  }, []);
-
   const nextSlide = useCallback(() => {
     setCurrentIndex((prev) => (prev + 1) % SLIDES.length);
   }, []);
@@ -179,21 +171,21 @@ export const ImageSlideshow: React.FC = () => {
                 }`}
               >
                 {shouldRender && (
-                  <img
-                    src={slide.src}
-                    srcSet={`${slide.mobileSrc} 640w, ${slide.src} 1200w`}
-                    sizes="(max-width: 640px) 100vw, 1152px"
-                    alt={slide.alt}
-                    width={1152}
-                    height={648}
-                    referrerPolicy="no-referrer"
-                    loading={idx === 0 ? 'eager' : 'lazy'}
-                    decoding={idx === 0 ? 'sync' : 'async'}
-                    fetchPriority={idx === 0 ? 'high' : 'low'}
-                    className={`w-full h-full object-cover object-center transform transition-transform duration-[7000ms] ease-out will-change-transform ${
-                      isActive ? 'scale-[1.03]' : 'scale-100'
-                    }`}
-                  />
+                  <picture className="w-full h-full block">
+                    <source media="(max-width: 640px)" srcSet={slide.mobileSrc} type="image/webp" />
+                    <source media="(min-width: 641px)" srcSet={slide.src} type="image/webp" />
+                    <img
+                      src={slide.mobileSrc}
+                      alt={slide.alt}
+                      width={1152}
+                      height={648}
+                      referrerPolicy="no-referrer"
+                      loading={idx === 0 ? 'eager' : 'lazy'}
+                      decoding={idx === 0 ? 'sync' : 'async'}
+                      fetchPriority={idx === 0 ? 'high' : 'low'}
+                      className="w-full h-full object-cover object-center"
+                    />
+                  </picture>
                 )}
               </div>
             );

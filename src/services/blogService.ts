@@ -164,7 +164,7 @@ export function parseBloggerFeedEntry(entry: any): BlogPost | null {
 
     // Fallback safe placeholder only if completely empty
     if (!coverImage) {
-      coverImage = 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=1200&auto=format&fit=crop';
+      coverImage = 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=600&q=70&auto=format&fm=webp&fit=crop';
     }
 
     // Excerpt extraction
@@ -262,7 +262,7 @@ export function extractBloggerPostsFromDOM(): BlogPost[] {
 
       // Find first image for cover
       const firstImg = el.getAttribute('data-firstimage') || bodyEl?.querySelector('img')?.getAttribute('src');
-      const coverImage = firstImg || 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?q=80&w=1200&auto=format&fit=crop';
+      const coverImage = firstImg || 'https://images.unsplash.com/photo-1457369804613-52c61a468e7d?w=600&q=70&auto=format&fm=webp&fit=crop';
 
       // Extract clean text paragraphs
       const tempDiv = document.createElement('div');

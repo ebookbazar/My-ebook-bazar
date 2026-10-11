@@ -4,6 +4,7 @@ import { Ebook, EbookRatingSummary } from '../types';
 import { useCart } from '../context/CartContext';
 import { isEbookAdminOwned } from '../utils/ebookOwnership';
 import { StarRating } from './StarRating';
+import { getOptimizedImageUrl } from '../utils/imageOptimizer';
 
 interface EbookCardProps {
   ebook: Ebook;
@@ -50,7 +51,7 @@ export const EbookCard: React.FC<EbookCardProps> = React.memo(({ ebook, onViewDe
       {/* Cover Image Container */}
       <div className="relative aspect-[3/4] bg-slate-100 overflow-hidden">
         <img 
-          src={ebook.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop'} 
+          src={getOptimizedImageUrl(ebook.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f', { width: 320, height: 426, quality: 72 })} 
           alt={ebook.title} 
           width={300}
           height={400}

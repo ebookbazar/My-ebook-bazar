@@ -4,6 +4,7 @@ import { Ebook, EbookRatingSummary } from '../types';
 import { useCart } from '../context/CartContext';
 import { isEbookAdminOwned } from '../utils/ebookOwnership';
 import { StarRating } from './StarRating';
+import { getOptimizedImageUrl } from '../utils/imageOptimizer';
 
 interface CuratedPicksSectionProps {
   ebooks: Ebook[];
@@ -68,7 +69,7 @@ export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = React.mem
                 {/* Book Cover */}
                 <div className="relative w-24 sm:w-28 aspect-[3/4] shrink-0 rounded-2xl overflow-hidden bg-slate-100 shadow-sm border border-slate-200/70">
                   <img
-                    src={book.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=400&auto=format&fit=crop'}
+                    src={getOptimizedImageUrl(book.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f', { width: 240, height: 320, quality: 72 })}
                     alt={book.title}
                     width={112}
                     height={150}
