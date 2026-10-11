@@ -185,6 +185,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         setIsAdmin(false);
       }
       setLoading(false);
+    }, (error) => {
+      console.warn('Auth state observation error:', error);
+      setCurrentUser(null);
+      setUserProfile(null);
+      setIsAdmin(false);
+      setLoading(false);
     });
 
     return () => unsubscribe();
@@ -205,6 +211,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { ...prev, ...val, uid };
         });
       }
+    }, (error) => {
+      console.warn('Realtime seller sync error:', error);
     });
 
     const unsubUser = onValue(userRef, (snap) => {
@@ -216,6 +224,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return { ...val, ...prev, ...val, uid };
         });
       }
+    }, (error) => {
+      console.warn('Realtime user sync error:', error);
     });
 
     return () => {

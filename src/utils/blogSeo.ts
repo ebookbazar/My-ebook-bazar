@@ -224,8 +224,10 @@ function injectArticleJsonLd(options: SeoMetaTagOptions): void {
     return;
   }
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ebookbazar.com';
-  const logoUrl = `${origin}/ebookbazar-logo.jpg`;
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ebookbazar.github.io';
+  const basePath = import.meta.env.BASE_URL || '/';
+  const fullBase = `${origin}${basePath.endsWith('/') ? basePath : basePath + '/'}`;
+  const logoUrl = `${fullBase}ebookbazar-logo.jpg`;
 
   const structuredData = {
     '@context': 'https://schema.org',
@@ -271,13 +273,15 @@ function injectArticleJsonLd(options: SeoMetaTagOptions): void {
 export function resetDocumentSeo(): void {
   if (typeof document === 'undefined') return;
 
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ebookbazar.com';
+  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://ebookbazar.github.io';
+  const basePath = import.meta.env.BASE_URL || '/';
+  const fullBase = `${origin}${basePath.endsWith('/') ? basePath : basePath + '/'}`;
 
   updateDocumentSeo({
     title: DEFAULT_SITE_TITLE,
     description: DEFAULT_SITE_DESC,
-    canonicalUrl: origin,
-    imageUrl: `${origin}/ebookbazar-logo.jpg`,
+    canonicalUrl: fullBase,
+    imageUrl: `${fullBase}ebookbazar-logo.jpg`,
     imageAlt: 'eBookBazar Logo',
     type: 'website',
     allowIndex: true
