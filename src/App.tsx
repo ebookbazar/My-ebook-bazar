@@ -19,7 +19,7 @@ import {
   Check,
   Calendar,
   Clock,
-  Trophy
+  Eye
 } from 'lucide-react';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { CartProvider, useCart } from './context/CartContext';
@@ -82,6 +82,7 @@ import { BLOG_POSTS } from './data/blogPosts';
 import { db, ref, onValue, set, update } from './firebase';
 import { subscribeToAllRatingSummaries, getLocalRatingSummaries } from './services/ratingService';
 import { getOptimizedImageUrl } from './utils/imageOptimizer';
+import { formatBlogViewCount } from './utils/blogFormatter';
 
 const CATEGORIES = [
   'সব বই',
@@ -983,7 +984,7 @@ function MainApp() {
                         </div>
 
                         <div className="p-5 sm:p-6 space-y-3">
-                          <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-500 font-semibold">
+                          <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-500 font-semibold">
                             <span className="flex items-center gap-1.5">
                               <Calendar className="w-4 h-4 text-emerald-600" />
                               <span>{post.date}</span>
@@ -991,6 +992,10 @@ function MainApp() {
                             <span className="flex items-center gap-1.5">
                               <Clock className="w-4 h-4 text-emerald-600" />
                               <span>{post.readTime}</span>
+                            </span>
+                            <span className="flex items-center gap-1.5 text-slate-600 font-bold" title="মোট পাঠ বা ভিউ সংখ্যা">
+                              <Eye className="w-4 h-4 text-emerald-600" />
+                              <span>{formatBlogViewCount(post.views ?? post.viewCount ?? 0)}</span>
                             </span>
                           </div>
 

@@ -1,5 +1,6 @@
-import { db, ref, onValue, set, push, remove } from '../firebase';
+import { db, ref, onValue, set, push, remove, runTransaction } from '../firebase';
 import { BlogPost } from '../types';
+import { formatBlogContentToHtml } from '../utils/blogFormatter';
 
 /**
  * Standard categories defined by user request.
@@ -198,7 +199,7 @@ export function parseBloggerFeedEntry(entry: any): BlogPost | null {
       coverImage,
       excerpt,
       content: paragraphs.slice(0, 10),
-      htmlContent,
+      htmlContent: formatBlogContentToHtml(htmlContent),
       url,
       isDemo: false,
       type: 'POST',
@@ -307,7 +308,7 @@ export function extractBloggerPostsFromDOM(): BlogPost[] {
         coverImage,
         excerpt,
         content: paragraphs.length > 0 ? paragraphs : [excerpt],
-        htmlContent,
+        htmlContent: formatBlogContentToHtml(htmlContent),
         url: url || undefined,
         isDemo: false,
         type: 'POST',
@@ -537,7 +538,9 @@ export async function saveBlogPostToFirebase(post: Omit<BlogPost, 'id'> & { id?:
     isDemo: false,
     type: 'POST',
     status,
-    allowIndex
+    allowIndex,
+    views: post.views !== undefined ? post.views : ((post as any).viewCount || 0),
+    htmlContent: post.htmlContent ? formatBlogContentToHtml(post.htmlContent) : (post.content ? formatBlogContentToHtml(post.content) : undefined)
   };
 
   // 1. Immediate local cache write (Dual-Layer persistence guarantee)
@@ -617,3 +620,109 @@ export async function setHideDemoBlogsSetting(hide: boolean): Promise<void> {
     set(mirrorSettingRef, hide).catch(() => {})
   ]);
 }
+
+export const LOCAL_STORAGE_BLOG_VIEWS_KEY = 'ebookbazar_blog_views_cache';
+
+/**
+ * Retrieve cached blog view counts from localStorage
+ */
+export function getLocalBlogViews(): Record<string, number> {
+  if (typeof window === 'undefined') return {};
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_BLOG_VIEWS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+/**
+ * Persist cached blog view counts to localStorage
+ */
+export function saveLocalBlogViews(viewsMap: Record<string, number>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(LOCAL_STORAGE_BLOG_VIEWS_KEY, JSON.stringify(viewsMap));
+  } catch {}
+}
+
+/**
+ * Atomically increments the view count for a specific blog post in Firebase Realtime Database.
+ * Employs session-based deduplication (one view per article per browser session) to prevent
+ * accidental duplicate counts caused by React re-renders, Strict Mode, or page refreshes.
+ */
+export async function recordBlogArticleView(postId: string): Promise<number | null> {
+  if (!postId) return null;
+  const cleanId = String(postId).replace(/[.#$[\]]/g, '_').trim();
+  if (!cleanId) return null;
+
+  // 1. Session deduplication safeguard
+  const sessionKey = `eb_viewed_blog_${cleanId}`;
+  if (typeof window !== 'undefined' && window.sessionStorage) {
+    try {
+      if (sessionStorage.getItem(sessionKey)) {
+        // Already recorded in this browser session
+        return null;
+      }
+      sessionStorage.setItem(sessionKey, String(Date.now()));
+    } catch {}
+  }
+
+  // 2. Concurrency-safe atomic transaction on blogViews/${cleanId}
+  let updatedCount: number | null = null;
+  try {
+    const viewRef = ref(db, `blogViews/${cleanId}`);
+    const res = await runTransaction(viewRef, (current) => {
+      return (Number(current) || 0) + 1;
+    });
+
+    if (res.committed && res.snapshot.exists()) {
+      updatedCount = Number(res.snapshot.val()) || 1;
+    }
+  } catch (err) {
+    console.warn('Firebase RTDB blogViews transaction note:', err);
+  }
+
+  // 3. Dual-layer mirror to blogs/${cleanId}/views
+  try {
+    const mirrorRef = ref(db, `blogs/${cleanId}/views`);
+    runTransaction(mirrorRef, (current) => (Number(current) || 0) + 1).catch(() => {});
+  } catch {}
+
+  // 4. Update local cache
+  if (updatedCount !== null) {
+    try {
+      const localMap = getLocalBlogViews();
+      localMap[cleanId] = updatedCount;
+      localMap[postId] = updatedCount;
+      saveLocalBlogViews(localMap);
+    } catch {}
+  }
+
+  return updatedCount;
+}
+
+/**
+ * Subscribes in real time to the blogViews node in Firebase RTDB,
+ * ensuring all public cards and article pages display the same persistent total.
+ */
+export function subscribeToAllBlogViews(callback: (viewsMap: Record<string, number>) => void): () => void {
+  const viewsRef = ref(db, 'blogViews');
+  const unsub = onValue(viewsRef, (snap) => {
+    const map: Record<string, number> = { ...getLocalBlogViews() };
+    if (snap.exists()) {
+      const val = snap.val() || {};
+      for (const [k, v] of Object.entries(val)) {
+        map[k] = Math.max(Number(v) || 0, map[k] || 0);
+      }
+      saveLocalBlogViews(map);
+    }
+    callback(map);
+  }, (err) => {
+    console.warn('Firebase RTDB blogViews listener note:', err?.message);
+    callback(getLocalBlogViews());
+  });
+
+  return unsub;
+}
+

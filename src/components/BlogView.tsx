@@ -18,10 +18,13 @@ import {
   Tag,
   AlertCircle,
   ShoppingBag,
-  Home
+  Home,
+  Eye
 } from 'lucide-react';
 import { BlogPost, Ebook } from '../types';
 import { updateDocumentSeo, resetDocumentSeo, getPublicBlogUrl, copyToClipboard } from '../utils/blogSeo';
+import { formatBlogContentToHtml, formatBlogViewCount } from '../utils/blogFormatter';
+import { recordBlogArticleView } from '../services/blogService';
 
 interface BlogViewProps {
   posts: BlogPost[];
@@ -53,6 +56,12 @@ export const BlogView: React.FC<BlogViewProps> = ({
   const [selectedCategory, setSelectedCategory] = useState<string>('সব');
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
+
+  // Accurate & persistent public article view count recording (Session deduplicated)
+  useEffect(() => {
+    if (!activePost || activePost.isDemo) return;
+    recordBlogArticleView(activePost.id);
+  }, [activePost?.id]);
 
   // Dynamic SEO Hook: Injects Title, Meta Description, Canonical, OG, Twitter & JSON-LD
   useEffect(() => {
@@ -422,6 +431,11 @@ export const BlogView: React.FC<BlogViewProps> = ({
                 <span>{activePost.readTime} পাঠ</span>
               </span>
             )}
+
+            <span className="flex items-center gap-1.5 text-emerald-800" title="মোট পাঠ বা ভিউ সংখ্যা">
+              <Eye className="w-4 h-4 text-emerald-700" />
+              <span>{formatBlogViewCount(activePost.views ?? activePost.viewCount ?? 0)}</span>
+            </span>
           </div>
 
           {/* Featured Cover Image with SEO Alt Text */}
@@ -443,52 +457,14 @@ export const BlogView: React.FC<BlogViewProps> = ({
             </div>
           )}
 
-          {/* FULL BLOG POST CONTENT */}
+          {/* FULL BLOG POST CONTENT (Formatted & Spaced with .blog-post-content) */}
           <div 
             onClick={handleArticleContentClick}
-            className="space-y-6 text-slate-800 text-base sm:text-lg leading-relaxed select-text"
-          >
-            {activePost.htmlContent ? (
-              <div 
-                className="prose prose-emerald max-w-none space-y-4 leading-relaxed font-normal [&>p]:leading-relaxed [&>p]:mb-4 [&>h2]:text-2xl [&>h2]:font-black [&>h2]:text-slate-900 [&>h2]:mt-8 [&>h2]:mb-3 [&>h3]:text-xl [&>h3]:font-bold [&>h3]:text-slate-900 [&>h3]:mt-6 [&>h3]:mb-2 [&_a]:text-emerald-700 [&_a]:underline [&_a]:font-semibold hover:[&_a]:text-emerald-900 [&>img]:rounded-2xl [&>img]:my-6 [&>img]:max-w-full [&>ul]:list-disc [&>ul]:pl-6 [&>ol]:list-decimal [&>ol]:pl-6"
-                dangerouslySetInnerHTML={{ __html: activePost.htmlContent }}
-              />
-            ) : (
-              <div className="space-y-5">
-                {activePost.content && activePost.content.map((paragraph, idx) => {
-                  // Render markdown or HTML headings if present in content array
-                  if (paragraph.startsWith('## ')) {
-                    return (
-                      <h2 key={idx} className="text-2xl font-black text-slate-900 mt-8 mb-3">
-                        {paragraph.replace(/^##\s+/, '')}
-                      </h2>
-                    );
-                  }
-                  if (paragraph.startsWith('### ')) {
-                    return (
-                      <h3 key={idx} className="text-xl font-bold text-slate-900 mt-6 mb-2">
-                        {paragraph.replace(/^###\s+/, '')}
-                      </h3>
-                    );
-                  }
-                  if (paragraph.includes('<')) {
-                    return (
-                      <div
-                        key={idx}
-                        className="leading-relaxed text-justify text-slate-800 [&_a]:text-emerald-700 [&_a]:underline [&_a]:font-semibold hover:[&_a]:text-emerald-900"
-                        dangerouslySetInnerHTML={{ __html: paragraph }}
-                      />
-                    );
-                  }
-                  return (
-                    <p key={idx} className="text-justify leading-relaxed font-normal text-slate-800">
-                      {paragraph}
-                    </p>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+            className="blog-post-content text-base sm:text-lg select-text"
+            dangerouslySetInnerHTML={{
+              __html: formatBlogContentToHtml(activePost.htmlContent || activePost.content)
+            }}
+          />
 
           {/* Social Sharing Buttons */}
           <div className="pt-6 border-t border-slate-100 space-y-3">
@@ -800,7 +776,7 @@ export const BlogView: React.FC<BlogViewProps> = ({
 
                   {/* Body Info */}
                   <div className="p-5 sm:p-6 space-y-3">
-                    <div className="flex items-center gap-3 text-xs sm:text-sm text-slate-500 font-semibold">
+                    <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-500 font-semibold">
                       <span className="flex items-center gap-1.5">
                         <Calendar className="w-4 h-4 text-emerald-600" />
                         <span>{post.date}</span>
@@ -811,6 +787,10 @@ export const BlogView: React.FC<BlogViewProps> = ({
                           <span>{post.readTime}</span>
                         </span>
                       )}
+                      <span className="flex items-center gap-1.5 text-slate-600" title="মোট ভিউ সংখ্যা">
+                        <Eye className="w-4 h-4 text-emerald-600" />
+                        <span>{formatBlogViewCount(post.views ?? post.viewCount ?? 0)}</span>
+                      </span>
                     </div>
 
                     <h3 
@@ -832,18 +812,12 @@ export const BlogView: React.FC<BlogViewProps> = ({
                     {isExpanded && (
                       <div className="pt-3 border-t border-slate-100 space-y-3 text-xs sm:text-sm text-slate-700 animate-fadeIn bg-slate-50 p-3 rounded-2xl border">
                         <div className="font-bold text-emerald-900 text-xs">ব্লগ পোস্টের মূল কনটেন্ট:</div>
-                        {post.htmlContent ? (
-                          <div 
-                            className="space-y-2 max-h-60 overflow-y-auto leading-relaxed"
-                            dangerouslySetInnerHTML={{ __html: post.htmlContent }}
-                          />
-                        ) : (
-                          <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {post.content && post.content.map((par, pIdx) => (
-                              <p key={pIdx} className="leading-relaxed text-justify">{par}</p>
-                            ))}
-                          </div>
-                        )}
+                        <div 
+                          className="blog-post-content max-h-60 overflow-y-auto text-xs sm:text-sm"
+                          dangerouslySetInnerHTML={{
+                            __html: formatBlogContentToHtml(post.htmlContent || post.content)
+                          }}
+                        />
                       </div>
                     )}
                   </div>

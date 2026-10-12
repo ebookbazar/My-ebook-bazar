@@ -108,6 +108,13 @@
         ".write": "auth != null && (root.child('admins/' + auth.uid).exists() || root.child('users/' + auth.uid + '/role').val() === 'admin' || auth.token.email === 'suma47083@gmail.com' || auth.token.email === 'admin@ebookbazar.com' || auth.token.email === 'redx0187@gmail.com')"
       }
     },
+    "blogViews": {
+      ".read": "true",
+      "$blogId": {
+        ".write": "true",
+        ".validate": "newData.isNumber() && (!data.exists() || newData.val() >= data.val())"
+      }
+    },
     "ratings": {
       ".read": "true",
       "$bookId": {

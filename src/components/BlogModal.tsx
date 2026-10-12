@@ -1,6 +1,7 @@
 import React from 'react';
-import { X, Calendar, Clock, User, Share2, BookOpen, ArrowRight } from 'lucide-react';
+import { X, Calendar, Clock, User, Share2, BookOpen, ArrowRight, Eye } from 'lucide-react';
 import { BlogPost } from '../types';
+import { formatBlogContentToHtml, formatBlogViewCount } from '../utils/blogFormatter';
 
 interface BlogModalProps {
   post: BlogPost | null;
@@ -71,22 +72,27 @@ export const BlogModal: React.FC<BlogModalProps> = ({ post, onClose, onExploreEb
                 <Clock className="w-4 h-4 text-emerald-700" />
                 <span>{post.readTime} পাঠ</span>
               </span>
+              <span className="flex items-center gap-1.5 text-emerald-800 font-bold" title="মোট পাঠ বা ভিউ সংখ্যা">
+                <Eye className="w-4 h-4 text-emerald-700" />
+                <span>{formatBlogViewCount(post.views ?? post.viewCount ?? 0)}</span>
+              </span>
             </div>
           </div>
 
           {/* Excerpt */}
-          <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-200 text-sm sm:text-base text-emerald-950 font-bold leading-relaxed">
-            {post.excerpt}
-          </div>
+          {post.excerpt && (
+            <div className="p-5 bg-emerald-50 rounded-2xl border border-emerald-200 text-sm sm:text-base text-emerald-950 font-bold leading-relaxed">
+              {post.excerpt}
+            </div>
+          )}
 
-          {/* Full Paragraphs */}
-          <div className="space-y-4 text-sm sm:text-base text-slate-700 leading-relaxed">
-            {post.content.map((p, idx) => (
-              <p key={idx} className="text-justify leading-relaxed">
-                {p}
-              </p>
-            ))}
-          </div>
+          {/* Full Paragraphs & Article Content (.blog-post-content styled) */}
+          <div 
+            className="blog-post-content text-sm sm:text-base text-slate-700 leading-relaxed select-text"
+            dangerouslySetInnerHTML={{
+              __html: formatBlogContentToHtml(post.htmlContent || post.content)
+            }}
+          />
 
           {/* Call to action */}
           <div className="bg-slate-50 p-5 sm:p-6 rounded-2xl border border-slate-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">

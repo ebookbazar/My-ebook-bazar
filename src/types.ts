@@ -127,6 +127,8 @@ export interface BlogPost {
   allowIndex?: boolean;
   internalLinks?: Array<{ text: string; url: string }>;
   externalLinks?: Array<{ text: string; url: string; rel?: string; target?: string }>;
+  views?: number;
+  viewCount?: number;
 }
 
 export interface MembershipPlan {

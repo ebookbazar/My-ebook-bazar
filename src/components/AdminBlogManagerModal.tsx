@@ -37,6 +37,7 @@ import {
 import { BlogPost, Ebook } from '../types';
 import { saveBlogPostToFirebase, deleteBlogPostFromFirebase, setHideDemoBlogsSetting, BLOG_PRESET_CATEGORIES } from '../services/blogService';
 import { generateSlug, ensureUniqueSlug, validateAndSanitizeUrl, analyzeContentSeo, getPublicBlogUrl, copyToClipboard } from '../utils/blogSeo';
+import { formatBlogViewCount, htmlToEditorText } from '../utils/blogFormatter';
 
 interface AdminBlogManagerModalProps {
   isOpen: boolean;
@@ -208,7 +209,7 @@ export const AdminBlogManagerModal: React.FC<AdminBlogManagerModalProps> = ({
     setCoverImage(post.coverImage);
     setImageAlt(post.imageAlt || post.title || '');
     setExcerpt(post.excerpt);
-    setContentBody(post.htmlContent || (post.content && post.content.join('\n\n')) || '');
+    setContentBody(post.htmlContent ? htmlToEditorText(post.htmlContent) : (post.content && post.content.join('\n\n')) || '');
     setPostStatus(post.status === 'DRAFT' ? 'DRAFT' : 'LIVE');
     setPublishedAtDate(
       typeof post.publishedAt === 'string' && post.publishedAt.includes('T') 
@@ -695,6 +696,11 @@ export const AdminBlogManagerModal: React.FC<AdminBlogManagerModalProps> = ({
 
                             <div className="flex flex-wrap items-center gap-3 text-xs text-slate-400 font-semibold mt-0.5">
                               <span>লেখক: {post.author}</span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1 text-slate-600 font-bold" title="মোট পাঠ বা ভিউ সংখ্যা">
+                                <Eye className="w-3.5 h-3.5 text-emerald-600" />
+                                <span>{formatBlogViewCount(post.views ?? post.viewCount ?? 0)}</span>
+                              </span>
                               <span>•</span>
                               <span>স্লাগ: <code className="text-emerald-800 bg-emerald-50 px-1 rounded text-[11px]">/blog/{post.slug || post.id}</code></span>
                             </div>
