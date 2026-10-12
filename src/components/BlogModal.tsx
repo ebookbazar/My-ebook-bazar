@@ -1,7 +1,9 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { X, Calendar, Clock, User, Share2, BookOpen, ArrowRight, Eye } from 'lucide-react';
 import { BlogPost } from '../types';
 import { formatBlogContentToHtml, formatBlogViewCount } from '../utils/blogFormatter';
+import { recordBlogArticleView } from '../services/blogService';
+import { recordBlogTrafficEvent, startVisitorHeartbeat } from '../services/blogAnalyticsService';
 
 interface BlogModalProps {
   post: BlogPost | null;
@@ -11,6 +13,18 @@ interface BlogModalProps {
 
 export const BlogModal: React.FC<BlogModalProps> = ({ post, onClose, onExploreEbooks }) => {
   if (!post) return null;
+
+  useEffect(() => {
+    if (!post || post.isDemo) return;
+    recordBlogArticleView(post.id);
+    recordBlogTrafficEvent(post.id, post.title);
+    const cleanup = startVisitorHeartbeat({
+      postId: post.id,
+      postTitle: post.title,
+      path: `/blog/${post.slug || post.id}`
+    });
+    return () => cleanup();
+  }, [post?.id]);
 
   const handleShare = () => {
     if (navigator.share) {

@@ -45,9 +45,20 @@ import {
   Home,
   Star,
   CornerDownRight,
-  Calculator
+  Calculator,
+  BarChart3
 } from 'lucide-react';
 import { AdminFreeToolsManager } from './AdminFreeToolsManager';
+import { AdminBlogAnalyticsSection } from './AdminBlogAnalyticsSection';
+import { 
+  subscribeToBlogTrafficData, 
+  computeBlogAnalyticsMetrics 
+} from '../services/blogAnalyticsService';
+import { getLocalBlogViews, subscribeToAllBlogViews } from '../services/blogService';
+import { 
+  BlogTrafficEvent, 
+  ActiveVisitorSession 
+} from '../types/blogAnalytics';
 import { auth, db, ref, onValue, update, remove, set, push, get, serverTimestamp, signInWithEmailAndPassword, onAuthStateChanged, runTransaction } from '../firebase';
 import { INITIAL_EBOOKS } from '../data/initialEbooks';
 import { isEbookAdminOwned, isEbookSellerOwned } from '../utils/ebookOwnership';
@@ -221,7 +232,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Tabs
   const [activeTab, setActiveTab] = useState<
-    'overview' | 'users' | 'sellers' | 'ebooks' | 'orders' | 'memberships' | 'withdrawals' | 'settings' | 'notifications' | 'affiliates' | 'rules' | 'xml' | 'tickets' | 'app-download' | 'tools'
+    'overview' | 'users' | 'sellers' | 'ebooks' | 'orders' | 'memberships' | 'withdrawals' | 'settings' | 'notifications' | 'affiliates' | 'rules' | 'xml' | 'tickets' | 'app-download' | 'tools' | 'blog-analytics'
   >('overview');
 
   // Synchronize active tab from URL route if specified (e.g. /admin/orders, /admin/users)
@@ -241,6 +252,7 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       else if (path.includes('tickets')) setActiveTab('tickets');
       else if (path.includes('app-download')) setActiveTab('app-download');
       else if (path.includes('tools')) setActiveTab('tools');
+      else if (path.includes('blog-analytics') || path.includes('analytics')) setActiveTab('blog-analytics');
     }
   }, []);
 
@@ -342,6 +354,41 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
 
   // Direct Withdrawal Processing State (No modal/popup)
   const [processingWithdrawId, setProcessingWithdrawId] = useState<string | null>(null);
+
+  // Blog Traffic Analytics State
+  const [analyticsEvents, setAnalyticsEvents] = useState<BlogTrafficEvent[]>([]);
+  const [activeVisitorSessions, setActiveVisitorSessions] = useState<ActiveVisitorSession[]>([]);
+  const [lifetimeBlogViewsMap, setLifetimeBlogViewsMap] = useState<Record<string, number>>(() => getLocalBlogViews());
+  const [isAnalyticsLoading, setIsAnalyticsLoading] = useState<boolean>(false);
+
+  // Subscribe to live blog views & rich traffic events
+  useEffect(() => {
+    // 1. Subscribe to lifetime view counters
+    const unsubViews = subscribeToAllBlogViews((map) => {
+      setLifetimeBlogViewsMap(map);
+    });
+
+    // 2. Subscribe to real-time events & active visitor sessions
+    const unsubTraffic = subscribeToBlogTrafficData(({ events, activeVisitors }) => {
+      setAnalyticsEvents(events);
+      setActiveVisitorSessions(activeVisitors);
+    });
+
+    return () => {
+      unsubViews();
+      unsubTraffic();
+    };
+  }, []);
+
+  // Compute live metrics from actual tracked data & persistent lifetime views
+  const blogAnalyticsComputed = useMemo(() => {
+    return computeBlogAnalyticsMetrics(
+      analyticsEvents,
+      activeVisitorSessions,
+      blogPosts,
+      lifetimeBlogViewsMap
+    );
+  }, [analyticsEvents, activeVisitorSessions, blogPosts, lifetimeBlogViewsMap]);
 
   // Manual Add Withdrawal / Send Payout State
   const [isAddWithdrawalOpen, setIsAddWithdrawalOpen] = useState(false);
@@ -2365,6 +2412,16 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
             <span>ফ্রি টুলস (Free Tools)</span>
           </button>
 
+          <button
+            onClick={() => setActiveTab('blog-analytics')}
+            className={`px-3 py-2 rounded-xl transition flex items-center gap-1.5 whitespace-nowrap ${
+              activeTab === 'blog-analytics' ? 'bg-[#15803d] text-white shadow ring-2 ring-emerald-400' : 'text-slate-300 hover:bg-slate-800'
+            }`}
+          >
+            <BarChart3 className="w-4 h-4 text-emerald-400" />
+            <span>ব্লগ ট্রাফিক অ্যানালিটিক্স</span>
+          </button>
+
           {onOpenBlogManager && (
             <button
               onClick={onOpenBlogManager}
@@ -2525,6 +2582,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
                     আজকে: {appDownloadMetrics.todayClicks}টি | এই মাসে: {appDownloadMetrics.thisMonthClicks}টি
+                  </p>
+                </div>
+
+                <div 
+                  onClick={() => setActiveTab('blog-analytics')}
+                  className="bg-white p-5 rounded-2xl border-2 border-emerald-600/60 hover:border-emerald-700 shadow-sm cursor-pointer hover:shadow-md transition group"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase text-emerald-800 flex items-center gap-1">
+                      <BarChart3 className="w-3.5 h-3.5 text-emerald-600" />
+                      <span>ব্লগ ট্রাফিক অ্যানালিটিক্স</span>
+                    </span>
+                    <span className="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                      রিপোর্ট
+                    </span>
+                  </div>
+                  <p className="text-3xl font-black text-slate-900 mt-1 group-hover:scale-105 transition-transform">
+                    {blogAnalyticsComputed.summary.totalLifetimeViews.toLocaleString()}
+                  </p>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    আজকে: {blogAnalyticsComputed.summary.todayViews} | সক্রিয়: {blogAnalyticsComputed.summary.activeVisitorsCount} জন
                   </p>
                 </div>
               </div>
@@ -4443,6 +4521,27 @@ service cloud.firestore {
               showToast={showToast}
               blogPosts={blogPosts}
               ebooks={ebooks}
+            />
+          )}
+
+          {/* TAB: BLOG TRAFFIC ANALYTICS */}
+          {activeTab === 'blog-analytics' && (
+            <AdminBlogAnalyticsSection
+              summary={blogAnalyticsComputed.summary}
+              postRows={blogAnalyticsComputed.postRows}
+              trafficSources={blogAnalyticsComputed.trafficSources}
+              countries={blogAnalyticsComputed.countries}
+              activeVisitors={activeVisitorSessions}
+              recentEvents={analyticsEvents}
+              isLoading={isAnalyticsLoading}
+              onRefresh={() => {
+                setIsAnalyticsLoading(true);
+                setTimeout(() => {
+                  setIsAnalyticsLoading(false);
+                  showToast('success', 'ব্লগ ট্রাফিক অ্যানালিটিক্স সফলভাবে রিফ্রেশ হয়েছে!');
+                }, 600);
+              }}
+              onOpenBlogEditor={onOpenBlogManager}
             />
           )}
 

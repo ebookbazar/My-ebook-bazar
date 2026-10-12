@@ -25,6 +25,7 @@ import { BlogPost, Ebook } from '../types';
 import { updateDocumentSeo, resetDocumentSeo, getPublicBlogUrl, copyToClipboard } from '../utils/blogSeo';
 import { formatBlogContentToHtml, formatBlogViewCount } from '../utils/blogFormatter';
 import { recordBlogArticleView } from '../services/blogService';
+import { recordBlogTrafficEvent, startVisitorHeartbeat } from '../services/blogAnalyticsService';
 
 interface BlogViewProps {
   posts: BlogPost[];
@@ -61,6 +62,18 @@ export const BlogView: React.FC<BlogViewProps> = ({
   useEffect(() => {
     if (!activePost || activePost.isDemo) return;
     recordBlogArticleView(activePost.id);
+    recordBlogTrafficEvent(activePost.id, activePost.title);
+  }, [activePost?.id]);
+
+  // Real-time Active Visitor Presence Heartbeat (5-min rolling window)
+  useEffect(() => {
+    // Only track when user is actually browsing blog (not in Admin preview)
+    const cleanup = startVisitorHeartbeat({
+      postId: activePost?.id,
+      postTitle: activePost?.title,
+      path: activePost ? `/blog/${activePost.slug || activePost.id}` : '/blog'
+    });
+    return () => cleanup();
   }, [activePost?.id]);
 
   // Dynamic SEO Hook: Injects Title, Meta Description, Canonical, OG, Twitter & JSON-LD
