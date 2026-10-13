@@ -483,7 +483,7 @@ export function computeBlogAnalyticsMetrics(
   postRows.sort((a, b) => b.lifetimeViews - a.lifetimeViews);
 
   // Build Traffic Source metrics
-  const totalClassifiedEvents = events.length;
+  const totalClassifiedEvents = safeEvents.length;
   const trafficSources: TrafficSourceMetric[] = Object.entries(sourceCountMap).map(([key, info]) => ({
     sourceKey: key,
     sourceName: info.name,
@@ -496,13 +496,13 @@ export function computeBlogAnalyticsMetrics(
   const countries: CountryMetric[] = Object.entries(countryCountMap).map(([cName, count]) => ({
     country: cName,
     viewsCount: count,
-    activeVisitorsCount: activeVisitors.filter(v => (v.country || 'Unavailable') === cName).length
+    activeVisitorsCount: safeVisitors.filter(v => (v.country || 'Unavailable') === cName).length
   }));
   if (countries.length === 0) {
     countries.push({
       country: 'Unavailable (অপ্রাপ্য)',
       viewsCount: totalClassifiedEvents,
-      activeVisitorsCount: activeVisitors.length
+      activeVisitorsCount: safeVisitors.length
     });
   }
 
@@ -513,9 +513,9 @@ export function computeBlogAnalyticsMetrics(
     last30DaysViews: last30DaysCount,
     currentMonthViews: currentMonthCount,
     currentYearViews: currentYearCount,
-    activeVisitorsCount: activeVisitors.length,
+    activeVisitorsCount: safeVisitors.length,
     totalPublishedPosts: publishedPosts.length,
-    totalTrackedEvents: events.length
+    totalTrackedEvents: safeEvents.length
   };
 
   return { summary, postRows, trafficSources, countries };
