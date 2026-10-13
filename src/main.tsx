@@ -48,6 +48,11 @@ class RootErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState
               <p className="text-xs text-slate-400 leading-relaxed">
                 অনুগ্রহ করে পেজটি রিলোড করুন অথবা হোমপেজে ফিরে যান। আপনার ডেটা সুরক্ষিত রয়েছে।
               </p>
+              {this.state.error && (
+                <div className="mt-2 p-3 rounded-xl bg-slate-950/60 border border-slate-700 text-left font-mono text-[11px] text-amber-300 max-h-32 overflow-y-auto">
+                  {this.state.error.message || String(this.state.error)}
+                </div>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button

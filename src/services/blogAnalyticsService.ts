@@ -360,16 +360,21 @@ export function subscribeToBlogTrafficData(callback: (data: {
  * Calculates aggregated summary metrics from lifetime views and tracked events
  */
 export function computeBlogAnalyticsMetrics(
-  events: BlogTrafficEvent[],
-  activeVisitors: ActiveVisitorSession[],
-  blogPosts: BlogPost[],
-  lifetimeViewsMap: Record<string, number>
+  events: BlogTrafficEvent[] = [],
+  activeVisitors: ActiveVisitorSession[] = [],
+  blogPosts: BlogPost[] = [],
+  lifetimeViewsMap: Record<string, number> = {}
 ): {
   summary: BlogAnalyticsSummary;
   postRows: PostAnalyticsRow[];
   trafficSources: TrafficSourceMetric[];
   countries: CountryMetric[];
 } {
+  const safeEvents = Array.isArray(events) ? events : [];
+  const safeVisitors = Array.isArray(activeVisitors) ? activeVisitors : [];
+  const safePosts = Array.isArray(blogPosts) ? blogPosts : [];
+  const safeLifetimeViewsMap = (lifetimeViewsMap && typeof lifetimeViewsMap === 'object') ? lifetimeViewsMap : {};
+
   const now = Date.now();
   const dhakaNow = getDhakaDateParts(now);
 
@@ -395,10 +400,12 @@ export function computeBlogAnalyticsMetrics(
   let currentYearCount = 0;
 
   // Process unique recorded events
-  for (const ev of events) {
-    const evTs = ev.timestamp || 0;
+  for (const ev of safeEvents) {
+    if (!ev || typeof ev !== 'object') continue;
+    const evTs = Number(ev.timestamp) || 0;
     const evParts = getDhakaDateParts(evTs);
-    const pid = ev.postId;
+    const pid = String(ev.postId || '');
+    if (!pid) continue;
 
     // Today (same YYYY-MM-DD in Asia/Dhaka)
     if (evParts.dateString === dhakaNow.dateString) {
@@ -445,12 +452,13 @@ export function computeBlogAnalyticsMetrics(
 
   // Calculate total lifetime views across all published posts
   let totalLifetimeViews = 0;
-  const publishedPosts = blogPosts.filter(p => p.status !== 'DRAFT');
+  const publishedPosts = safePosts.filter(p => p && p.status !== 'DRAFT');
 
   for (const post of publishedPosts) {
-    const cleanId = String(post.id).replace(/[.#$[\]]/g, '_');
-    const views = lifetimeViewsMap[cleanId] ?? lifetimeViewsMap[post.id] ?? post.views ?? post.viewCount ?? 0;
-    totalLifetimeViews += views;
+    if (!post) continue;
+    const cleanId = String(post.id || '').replace(/[.#$[\]]/g, '_');
+    const views = safeLifetimeViewsMap[cleanId] ?? safeLifetimeViewsMap[post.id] ?? post.views ?? post.viewCount ?? 0;
+    totalLifetimeViews += Number(views) || 0;
   }
 
   // Build per-post analytics rows

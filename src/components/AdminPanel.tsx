@@ -361,24 +361,27 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [lifetimeBlogViewsMap, setLifetimeBlogViewsMap] = useState<Record<string, number>>(() => getLocalBlogViews());
   const [isAnalyticsLoading, setIsAnalyticsLoading] = useState<boolean>(false);
 
-  // Subscribe to live blog views & rich traffic events
+  // Subscribe to live blog views & rich traffic events (Only when authenticated as Admin to prevent unauthorized listeners from failing before login)
   useEffect(() => {
     // 1. Subscribe to lifetime view counters
     const unsubViews = subscribeToAllBlogViews((map) => {
       setLifetimeBlogViewsMap(map);
     });
 
-    // 2. Subscribe to real-time events & active visitor sessions
-    const unsubTraffic = subscribeToBlogTrafficData(({ events, activeVisitors }) => {
-      setAnalyticsEvents(events);
-      setActiveVisitorSessions(activeVisitors);
-    });
+    // 2. Subscribe to real-time events & active visitor sessions ONLY if admin is authenticated
+    let unsubTraffic: (() => void) | null = null;
+    if (currentUser && isAdmin) {
+      unsubTraffic = subscribeToBlogTrafficData(({ events, activeVisitors }) => {
+        setAnalyticsEvents(events);
+        setActiveVisitorSessions(activeVisitors);
+      });
+    }
 
     return () => {
       unsubViews();
-      unsubTraffic();
+      if (unsubTraffic) unsubTraffic();
     };
-  }, []);
+  }, [currentUser, isAdmin]);
 
   // Compute live metrics from actual tracked data & persistent lifetime views
   const blogAnalyticsComputed = useMemo(() => {
@@ -2599,10 +2602,10 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     </span>
                   </div>
                   <p className="text-3xl font-black text-slate-900 mt-1 group-hover:scale-105 transition-transform">
-                    {blogAnalyticsComputed.summary.totalLifetimeViews.toLocaleString()}
+                    {(blogAnalyticsComputed?.summary?.totalLifetimeViews || 0).toLocaleString()}
                   </p>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    আজকে: {blogAnalyticsComputed.summary.todayViews} | সক্রিয়: {blogAnalyticsComputed.summary.activeVisitorsCount} জন
+                    আজকে: {blogAnalyticsComputed?.summary?.todayViews || 0} | সক্রিয়: {blogAnalyticsComputed?.summary?.activeVisitorsCount || 0} জন
                   </p>
                 </div>
               </div>
