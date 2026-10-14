@@ -62,18 +62,28 @@ export const AppDownloadBanner: React.FC<AppDownloadBannerProps> = ({
 
   return (
     <div className="bg-white rounded-2xl p-4 sm:p-5 border border-emerald-200/90 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4 transition hover:border-emerald-300">
-      <div className="flex items-start sm:items-center gap-3.5">
+      <div className="flex items-start sm:items-center gap-3.5 flex-1 min-w-0">
         <div className="w-11 h-11 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center shrink-0 shadow-xs border border-emerald-200">
           <Smartphone className="w-6 h-6 text-emerald-700" />
         </div>
-        <div className="space-y-0.5">
-          <div className="flex items-center gap-2">
-            <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-              {title}
-            </h3>
-            <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200">
-              <Sparkles className="w-3 h-3 text-emerald-600" />
-              <span>মোবাইল অ্যাপ</span>
+        <div className="flex-1 min-w-0 space-y-1">
+          {/* Flexbox layout: Heading aligned to the left, '24' aligned to the right, vertically centered */}
+          <div className="flex items-center justify-between gap-3 w-full">
+            <div className="flex items-center gap-2 min-w-0 flex-wrap">
+              <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight break-words">
+                {title}
+              </h3>
+              <span className="hidden sm:inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-wider bg-emerald-50 text-emerald-800 px-2 py-0.5 rounded-full border border-emerald-200 shrink-0">
+                <Sparkles className="w-3 h-3 text-emerald-600" />
+                <span>মোবাইল অ্যাপ</span>
+              </span>
+            </div>
+            <span
+              className="text-[#2563EB] font-bold text-[20px] leading-none shrink-0"
+              style={{ color: '#2563EB', fontSize: '20px', fontWeight: 'bold' }}
+              aria-label="24"
+            >
+              24
             </span>
           </div>
           <p className="text-xs sm:text-sm text-slate-600 font-medium leading-relaxed">
