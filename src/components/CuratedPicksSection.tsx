@@ -1,5 +1,5 @@
 import React from 'react';
-import { Sparkles, Eye, ShoppingCart, Crown, ShoppingBag, ArrowRight } from 'lucide-react';
+import { Sparkles, Eye, ShoppingCart, Crown, ShoppingBag, ArrowRight, Share2 } from 'lucide-react';
 import { Ebook, EbookRatingSummary } from '../types';
 import { useCart } from '../context/CartContext';
 import { isEbookAdminOwned } from '../utils/ebookOwnership';
@@ -10,6 +10,7 @@ interface CuratedPicksSectionProps {
   ebooks: Ebook[];
   onViewDetails: (ebook: Ebook) => void;
   onBuyNow: (ebook: Ebook) => void;
+  onShare?: (ebook: Ebook) => void;
   ratingSummaries?: Record<string, EbookRatingSummary>;
 }
 
@@ -17,6 +18,7 @@ export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = React.mem
   ebooks,
   onViewDetails,
   onBuyNow,
+  onShare,
   ratingSummaries = {}
 }) => {
   const { addToCart } = useCart();
@@ -137,29 +139,44 @@ export const CuratedPicksSection: React.FC<CuratedPicksSectionProps> = React.mem
               </div>
 
               {/* Action Buttons */}
-              <div className="mt-4 pt-3 border-t border-slate-100 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onViewDetails(book);
-                  }}
-                  className="px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center gap-1"
-                >
-                  <Eye className="w-3.5 h-3.5 text-slate-500" />
-                  <span>বিস্তারিত</span>
-                </button>
+              <div className="mt-4 pt-3 border-t border-slate-100 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onViewDetails(book);
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center gap-1 cursor-pointer"
+                  >
+                    <Eye className="w-3.5 h-3.5 text-slate-500" />
+                    <span>বিস্তারিত</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onBuyNow(book);
+                    }}
+                    className="px-3 py-2 rounded-xl text-xs font-black text-white bg-emerald-700 hover:bg-emerald-800 transition flex items-center justify-center gap-1 shadow-xs active:scale-95 cursor-pointer"
+                  >
+                    <ShoppingCart className="w-3.5 h-3.5 text-amber-300" />
+                    <span>কিনুন</span>
+                  </button>
+                </div>
 
                 <button
                   type="button"
                   onClick={(e) => {
                     e.stopPropagation();
-                    onBuyNow(book);
+                    if (onShare) onShare(book);
                   }}
-                  className="px-3 py-2 rounded-xl text-xs font-black text-white bg-emerald-700 hover:bg-emerald-800 transition flex items-center justify-center gap-1 shadow-xs active:scale-95"
+                  className="w-full py-1.5 px-3 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 transition flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer shadow-2xs"
+                  title="eBook শেয়ার করুন"
                 >
-                  <ShoppingCart className="w-3.5 h-3.5 text-amber-300" />
-                  <span>কিনুন</span>
+                  <Share2 className="w-3.5 h-3.5 text-emerald-700" />
+                  <span>🔗 শেয়ার করুন</span>
                 </button>
               </div>
             </div>

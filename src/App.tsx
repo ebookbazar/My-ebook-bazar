@@ -26,10 +26,9 @@ import { CartProvider, useCart } from './context/CartContext';
 import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { EbookCard } from './components/EbookCard';
-import { ImageSlideshow } from './components/ImageSlideshow';
-import { HomeFeatureCards } from './components/HomeFeatureCards';
+import { EbookSalesHero } from './components/EbookSalesHero';
+import { EbookShareModal } from './components/EbookShareModal';
 import { RealWebsiteStats } from './components/RealWebsiteStats';
-import { CuratedPicksSection } from './components/CuratedPicksSection';
 import { AppDownloadBanner } from './components/AppDownloadBanner';
 
 // Dynamic lazy-loaded views, widgets & heavy modals for lightning-fast initial page load
@@ -157,6 +156,9 @@ function MainApp() {
   
   // Selected eBook for detail modal
   const [selectedEbook, setSelectedEbook] = useState<Ebook | null>(null);
+  
+  // Selected eBook for Share modal
+  const [ebookToShare, setEbookToShare] = useState<Ebook | null>(null);
   
   // Direct item for Checkout
   const [directCheckoutItem, setDirectCheckoutItem] = useState<Ebook | null>(null);
@@ -535,12 +537,51 @@ function MainApp() {
           setSelectedToolId(null);
         }
       }
+
+      // 4. Synchronize direct eBook Details URL (?ebook=id, ?book=id, or /ebook/id)
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const ebookParam = urlParams.get('ebook') || urlParams.get('book');
+        let targetEbookId = ebookParam ? ebookParam.trim() : null;
+        if (!targetEbookId && pathname.startsWith('/ebook/')) {
+          targetEbookId = pathname.replace('/ebook/', '').replace(/\/$/, '').trim();
+        }
+
+        if (targetEbookId) {
+          const matched = (ebooks && ebooks.length > 0 ? ebooks : INITIAL_EBOOKS).find(b => b.id === targetEbookId);
+          if (matched) {
+            setSelectedEbook(matched);
+            setCurrentView('home');
+          }
+        }
+      } catch {
+        // Safe parameter parsing fallback
+      }
     };
 
     handleUrlRoute();
     window.addEventListener('popstate', handleUrlRoute);
     return () => window.removeEventListener('popstate', handleUrlRoute);
-  }, [blogPosts, currentUser, userProfile]);
+  }, [blogPosts, ebooks, currentUser, userProfile]);
+
+  const handleSelectEbook = (book: Ebook | null) => {
+    setSelectedEbook(book);
+    if (typeof window !== 'undefined') {
+      const basePath = getAppBaseUrl();
+      if (book) {
+        const targetUrl = `${basePath}/?ebook=${encodeURIComponent(book.id)}`;
+        if (window.location.search !== `?ebook=${encodeURIComponent(book.id)}`) {
+          window.history.pushState({ ebookId: book.id }, '', targetUrl);
+        }
+      } else {
+        const search = window.location.search;
+        if (search.includes('ebook=') || search.includes('book=') || window.location.pathname.includes('/ebook/')) {
+          const homeUrl = basePath + '/' || '/';
+          window.history.pushState({}, '', homeUrl);
+        }
+      }
+    }
+  };
 
   const handleOpenBlog = (post: BlogPost) => {
     setSelectedBlogPost(post);
@@ -721,7 +762,7 @@ function MainApp() {
         {/* VIEW 1: HOME MARKETPLACE */}
         {currentView === 'home' && (
           <div className="space-y-6 md:space-y-8">
-            {/* Frontend App Download Section (Header-এর ঠিক নিচে ও Homepage-এর মূল কন্টেন্ট শুরুর আগে) */}
+            {/* 3. Existing App Download Section (Header-এর ঠিক নিচে ও Hero-এর উপরে) */}
             <AppDownloadBanner
               title={appDownloadSettings.appDownloadTitle}
               text={appDownloadSettings.appDownloadText}
@@ -730,57 +771,77 @@ function MainApp() {
               enabled={appDownloadSettings.active !== false && appDownloadSettings.appDownloadEnabled !== false}
             />
 
-            {/* 1. Existing Slideshow / Hero Banner (Preserved layout, rounded corners, subtle shadow) */}
-            <div className="pt-1">
-              <ImageSlideshow />
-            </div>
-
-            {/* 2. Real Website Stats (Firebase Realtime Database: eBooks, Readers/Users, Sellers) */}
-            <RealWebsiteStats
-              totalEbooks={ebooks ? ebooks.length : null}
-              totalUsers={totalUsersCount}
-              totalSellers={totalSellersCount}
-            />
-
-            {/* 3. Existing 6 Home Feature Cards (BELOW Slideshow & Stats) */}
-            <HomeFeatureCards
-              currentView={currentView}
-              setCurrentView={(view) => {
-                setCurrentView(view);
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
-
-            {/* 5. আজকের বাছাই (Top 3 Real Curated eBooks from Firebase) */}
-            <CuratedPicksSection
+            {/* 4. Professional Sales Hero Banner */}
+            <EbookSalesHero
               ebooks={ebooks}
-              onViewDetails={(book) => setSelectedEbook(book)}
-              onBuyNow={handleBuyNow}
-              ratingSummaries={ratingSummaries}
+              onExploreEbooks={() => {
+                const el = document.getElementById('curated-picks') || document.getElementById('ebook-categories');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              onViewCurated={() => {
+                const el = document.getElementById('curated-picks');
+                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              }}
+              onSelectBook={handleSelectEbook}
             />
 
-            {/* 5.1 ফ্রি ক্যালকুলেটর ও স্মার্ট টুলস (Free Tools Section) */}
-            <HomeFreeToolsSection
-              tools={freeTools}
-              onOpenTool={(toolId) => {
-                setSelectedToolId(toolId);
-                setCurrentView('tools');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-              onOpenAllTools={() => {
-                setSelectedToolId(null);
-                setCurrentView('tools');
-                window.scrollTo({ top: 0, behavior: 'smooth' });
-              }}
-            />
+            {/* 5. "আপনার জন্য বাছাই করা eBook" Section & 6. Preserve all 6 existing selected eBook cards */}
+            <section id="curated-picks" aria-label="আপনার জন্য বাছাই করা eBook" className="space-y-4 pt-1">
+              <div id="ebooks-catalog" className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 pb-1">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black tracking-wide mb-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>বাছাইকৃত ডিজিটাল বই</span>
+                  </div>
+                  <h2 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-900 flex items-center gap-2">
+                    <span>আপনার জন্য বাছাই করা eBook</span>
+                    <span className="text-sm md:text-base font-bold text-slate-500">
+                      ({filteredEbooks.length}টি)
+                    </span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-slate-600 mt-0.5 font-medium">
+                    স্কিল ডেভেলপমেন্ট, প্রোগ্রামিং ও ক্যারিয়ার গড়ার জন্য সর্বাধিক পছন্দের ৬টি সেরা ডিজিটাল বই
+                  </p>
+                </div>
+              </div>
 
-            {/* 6. জনপ্রিয় বিভাগ ও ফিল্টার সার্চ */}
-            <div className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200/80 space-y-6">
+              {filteredEbooks.length === 0 ? (
+                <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
+                  <BookOpen className="w-12 h-12 text-slate-300 mx-auto" />
+                  <h3 className="font-black text-slate-800 text-lg">কোনো বই পাওয়া যায়নি</h3>
+                  <p className="text-sm text-slate-500 max-w-sm mx-auto">
+                    আপনার সার্চ কি-ওয়ার্ড অথবা ক্যাটাগরি ফিল্টার পরিবর্তন করে পুনরায় চেষ্টা করুন।
+                  </p>
+                  <button
+                    onClick={() => { setSelectedCategory('সব বই'); setSearchQuery(''); setSelectedLevel('all'); }}
+                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition cursor-pointer"
+                  >
+                    সব বই দেখুন
+                  </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3.5 sm:gap-4 md:gap-5">
+                  {filteredEbooks.map((book) => (
+                    <EbookCard
+                      key={book.id}
+                      ebook={book}
+                      onViewDetails={handleSelectEbook}
+                      onBuyNow={handleBuyNow}
+                      onShare={(b) => setEbookToShare(b)}
+                      ratingSummary={ratingSummaries[book.id]}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* 7. Existing eBook Categories & Search Filter */}
+            <div id="ebook-categories" className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200/80 space-y-6">
               <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
                 <div>
-                  <h1 className="text-2xl md:text-3xl lg:text-4xl font-black text-slate-900 tracking-tight">
+                  <h2 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
                     সেরা বাংলা ই-বুক মার্কেটপ্লেস
-                  </h1>
+                  </h2>
                   <p className="text-sm md:text-base text-slate-600 mt-1 font-medium">
                     স্কিল ডেভেলপমেন্ট, প্রোগ্রামিং, সাহিত্য ও ক্যারিয়ার প্রস্তুতিমূলক ডিজিটাল বই
                   </p>
@@ -799,7 +860,7 @@ function MainApp() {
                   {searchQuery && (
                     <button 
                       onClick={() => setSearchQuery('')}
-                      className="absolute right-3.5 top-3 text-sm font-bold text-slate-400 hover:text-slate-600"
+                      className="absolute right-3.5 top-3 text-sm font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
                     >
                       ✕
                     </button>
@@ -819,8 +880,12 @@ function MainApp() {
                   {CATEGORIES.map((cat) => (
                     <button
                       key={cat}
-                      onClick={() => setSelectedCategory(cat)}
-                      className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all duration-200 shadow-xs ${
+                      onClick={() => {
+                        setSelectedCategory(cat);
+                        const el = document.getElementById('curated-picks');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                      className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all duration-200 shadow-xs cursor-pointer ${
                         selectedCategory === cat
                           ? 'bg-[#15803d] text-white shadow-emerald-700/25 ring-2 ring-emerald-600'
                           : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
@@ -841,7 +906,7 @@ function MainApp() {
                       <button
                         key={lvl}
                         onClick={() => setSelectedLevel(lvl)}
-                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition ${
+                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
                           selectedLevel === lvl 
                             ? 'bg-slate-900 text-white' 
                             : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
@@ -868,53 +933,31 @@ function MainApp() {
               </div>
             </div>
 
-            {/* 7. নতুন eBook (Ebooks Grid) */}
-            <div className="space-y-4">
-              <div className="flex justify-between items-center">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black tracking-wide mb-1">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>মার্কেটপ্লেস ক্যাটালগ</span>
-                  </div>
-                  <h2 className="text-xl md:text-2xl font-black text-slate-900 flex items-center gap-2">
-                    <span>নতুন eBook</span>
-                    <span className="text-sm md:text-base font-bold text-slate-500">
-                      ({filteredEbooks.length}টি)
-                    </span>
-                  </h2>
-                </div>
-              </div>
-
-              {filteredEbooks.length === 0 ? (
-                <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
-                  <BookOpen className="w-12 h-12 text-slate-300 mx-auto" />
-                  <h3 className="font-black text-slate-800 text-lg">কোনো বই পাওয়া যায়নি</h3>
-                  <p className="text-sm text-slate-500 max-w-sm mx-auto">
-                    আপনার সার্চ কি-ওয়ার্ড অথবা ক্যাটাগরি ফিল্টার পরিবর্তন করে পুনরায় চেষ্টা করুন।
-                  </p>
-                  <button
-                    onClick={() => { setSelectedCategory('সব বই'); setSearchQuery(''); setSelectedLevel('all'); }}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition"
-                  >
-                    সব বই দেখুন
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4 md:gap-5">
-                  {filteredEbooks.map((book) => (
-                    <EbookCard
-                      key={book.id}
-                      ebook={book}
-                      onViewDetails={(b) => setSelectedEbook(b)}
-                      onBuyNow={handleBuyNow}
-                      ratingSummary={ratingSummaries[book.id]}
-                    />
-                  ))}
-                </div>
-              )}
+            {/* 10. Existing Tools & Calculators Section */}
+            <div id="free-tools">
+              <HomeFreeToolsSection
+                tools={freeTools}
+                onOpenTool={(toolId) => {
+                  setSelectedToolId(toolId);
+                  setCurrentView('tools');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+                onOpenAllTools={() => {
+                  setSelectedToolId(null);
+                  setCurrentView('tools');
+                  window.scrollTo({ top: 0, behavior: 'smooth' });
+                }}
+              />
             </div>
 
-            {/* 8. সর্বশেষ লেখা (Featured Real Blog Posts Section on Home, exactly 3 latest articles) */}
+            {/* 11. Live Website Stats & Latest Blog Posts */}
+            <RealWebsiteStats
+              totalEbooks={ebooks ? ebooks.length : null}
+              totalUsers={totalUsersCount}
+              totalSellers={totalSellersCount}
+            />
+
+            {/* 11c. সর্বশেষ লেখা (Featured Real Blog Posts Section on Home, exactly 3 latest articles) */}
             <div className="pt-8 border-t border-slate-200 space-y-6">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                 <div>
@@ -1033,7 +1076,7 @@ function MainApp() {
               setActivePost={handleSetSelectedBlogPost}
               onNavigateHome={handleNavigateHomeFromBlog}
               onSelectEbook={(b) => {
-                setSelectedEbook(b);
+                handleSelectEbook(b);
                 setCurrentView('home');
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
@@ -1469,7 +1512,7 @@ function MainApp() {
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onOpenBlog={handleOpenBlog}
-              onViewEbook={(b) => setSelectedEbook(b)}
+              onViewEbook={(b) => handleSelectEbook(b)}
               onAddToCart={handleAddToCart}
               allBlogPosts={blogPosts}
               allEbooks={ebooks}
@@ -1484,7 +1527,7 @@ function MainApp() {
           <FloatingSearch
             ebooks={ebooks}
             blogPosts={displayedBlogPosts}
-            onSelectEbook={(b) => setSelectedEbook(b)}
+            onSelectEbook={(b) => handleSelectEbook(b)}
             onSelectBlogPost={(p) => {
               handleOpenBlog(p);
             }}
@@ -1511,9 +1554,10 @@ function MainApp() {
         <Suspense fallback={null}>
           <EbookDetailModal
             ebook={selectedEbook}
-            onClose={() => setSelectedEbook(null)}
+            onClose={() => handleSelectEbook(null)}
             onBuyNow={handleBuyNow}
             onOpenPreview={handleOpenPdfReader}
+            onShare={(b) => setEbookToShare(b)}
             onOpenAuthModal={() => {
               setIsAuthOpen(true);
               setAuthInitialMode('user-login');
@@ -1521,6 +1565,15 @@ function MainApp() {
             ratingSummary={selectedEbook ? ratingSummaries[selectedEbook.id] : undefined}
           />
         </Suspense>
+      )}
+
+      {/* MODAL: UNIVERSAL EBOOK SHARE MODAL */}
+      {ebookToShare && (
+        <EbookShareModal
+          ebook={ebookToShare}
+          isOpen={Boolean(ebookToShare)}
+          onClose={() => setEbookToShare(null)}
+        />
       )}
 
       {/* MODAL 2: CART MODAL */}

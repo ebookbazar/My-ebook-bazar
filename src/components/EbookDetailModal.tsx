@@ -15,7 +15,8 @@ import {
   CheckCircle2, 
   AlertCircle,
   MessageSquare,
-  ThumbsUp
+  ThumbsUp,
+  Share2
 } from 'lucide-react';
 import { Ebook, EbookRating, EbookRatingSummary } from '../types';
 import { useCart } from '../context/CartContext';
@@ -28,6 +29,7 @@ import {
   deleteEbookRating,
   calculateRatingSummary 
 } from '../services/ratingService';
+import { EbookShareModal } from './EbookShareModal';
 
 interface EbookDetailModalProps {
   ebook: Ebook | null;
@@ -35,6 +37,7 @@ interface EbookDetailModalProps {
   onBuyNow: (ebook: Ebook) => void;
   onOpenPreview?: (url: string, title: string) => void;
   onOpenAuthModal?: () => void;
+  onShare?: (ebook: Ebook) => void;
   ratingSummary?: EbookRatingSummary;
 }
 
@@ -44,6 +47,7 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
   onBuyNow,
   onOpenPreview,
   onOpenAuthModal,
+  onShare,
   ratingSummary: initialSummary,
 }) => {
   const { addToCart } = useCart();
@@ -51,6 +55,7 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
 
   const [reviews, setReviews] = useState<EbookRating[]>([]);
   const [activeTab, setActiveTab] = useState<'details' | 'reviews'>('details');
+  const [isShareModalOpen, setIsShareModalOpen] = useState<boolean>(false);
 
   // Rating input state
   const [userRating, setUserRating] = useState<number>(5);
@@ -372,25 +377,43 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
                 </div>
 
                 {/* Action Buttons */}
-                <div className="grid grid-cols-2 gap-3 pt-4 border-t border-slate-100">
-                  <button
-                    type="button"
-                    onClick={handleAddToCart}
-                    className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm py-3 rounded-2xl transition shadow flex items-center justify-center gap-2 active:scale-95"
-                  >
-                    <ShoppingCart className="w-4 h-4" />
-                    <span>কার্টে রাখুন</span>
-                  </button>
+                <div className="space-y-3 pt-4 border-t border-slate-100">
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={handleAddToCart}
+                      className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm py-3 rounded-2xl transition shadow-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                    >
+                      <ShoppingCart className="w-4 h-4" />
+                      <span>কার্টে রাখুন</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onClose();
+                        onBuyNow(ebook);
+                      }}
+                      className="bg-[#15803d] hover:bg-emerald-800 text-white font-black text-xs sm:text-sm py-3 rounded-2xl transition shadow-xs flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+                    >
+                      <Zap className="w-4 h-4 text-amber-300" />
+                      <span>এখনই কিনুন</span>
+                    </button>
+                  </div>
+
+                  {/* Share eBook Button */}
                   <button
                     type="button"
                     onClick={() => {
-                      onClose();
-                      onBuyNow(ebook);
+                      if (onShare) {
+                        onShare(ebook);
+                      } else {
+                        setIsShareModalOpen(true);
+                      }
                     }}
-                    className="bg-[#15803d] hover:bg-emerald-800 text-white font-black text-xs sm:text-sm py-3 rounded-2xl transition shadow flex items-center justify-center gap-2 active:scale-95"
+                    className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300/80 font-black text-xs sm:text-sm py-2.5 rounded-2xl transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-2xs"
                   >
-                    <Zap className="w-4 h-4 text-amber-300" />
-                    <span>এখনই কিনুন</span>
+                    <Share2 className="w-4 h-4 text-emerald-700" />
+                    <span>🔗 শেয়ার করুন</span>
                   </button>
                 </div>
               </div>
@@ -672,6 +695,13 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
           )}
         </div>
       </div>
+
+      {/* Share Modal Dialog */}
+      <EbookShareModal
+        ebook={ebook}
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+      />
     </div>
   );
 };

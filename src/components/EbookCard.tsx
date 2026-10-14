@@ -1,5 +1,5 @@
 import React from 'react';
-import { ShoppingCart, Eye, Zap, BookOpen, Crown, ShoppingBag } from 'lucide-react';
+import { ShoppingCart, Eye, Zap, BookOpen, Crown, ShoppingBag, Share2 } from 'lucide-react';
 import { Ebook, EbookRatingSummary } from '../types';
 import { useCart } from '../context/CartContext';
 import { isEbookAdminOwned } from '../utils/ebookOwnership';
@@ -10,10 +10,11 @@ interface EbookCardProps {
   ebook: Ebook;
   onViewDetails: (ebook: Ebook) => void;
   onBuyNow: (ebook: Ebook) => void;
+  onShare?: (ebook: Ebook) => void;
   ratingSummary?: EbookRatingSummary;
 }
 
-export const EbookCard: React.FC<EbookCardProps> = React.memo(({ ebook, onViewDetails, onBuyNow, ratingSummary }) => {
+export const EbookCard: React.FC<EbookCardProps> = React.memo(({ ebook, onViewDetails, onBuyNow, onShare, ratingSummary }) => {
   const { addToCart } = useCart();
   const regularPrice = ebook.regularPrice || (ebook.discountPrice && ebook.discountPrice < ebook.price ? ebook.price : ebook.price);
   const salePrice = ebook.discountPrice ? Math.min(ebook.discountPrice, ebook.price) : (ebook.regularPrice && ebook.regularPrice > ebook.price ? ebook.price : ebook.price);
@@ -142,25 +143,55 @@ export const EbookCard: React.FC<EbookCardProps> = React.memo(({ ebook, onViewDe
           </div>
 
           {/* Action Buttons */}
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={handleAddToCart}
-              className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
-              title="কার্টে যোগ করুন"
-            >
-              <ShoppingCart className="w-4 h-4" />
-              <span>কার্ট</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleBuyNow}
-              className="bg-emerald-800 hover:bg-emerald-900 text-white font-black text-xs sm:text-sm py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5 active:scale-95"
-              title="সরাসরি কিনুন"
-            >
-              <Zap className="w-4 h-4 text-amber-300" />
-              <span>কিনুন</span>
-            </button>
+          <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={handleAddToCart}
+                className="bg-amber-400 hover:bg-amber-500 text-slate-950 font-black text-xs sm:text-sm py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                title="কার্টে যোগ করুন"
+              >
+                <ShoppingCart className="w-4 h-4" />
+                <span>কার্ট</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleBuyNow}
+                className="bg-[#15803d] hover:bg-emerald-800 text-white font-black text-xs sm:text-sm py-2.5 rounded-xl transition shadow-xs flex items-center justify-center gap-1.5 active:scale-95 cursor-pointer"
+                title="সরাসরি কিনুন"
+              >
+                <Zap className="w-4 h-4 text-amber-300" />
+                <span>কিনুন</span>
+              </button>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2 pt-0.5">
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onViewDetails(ebook);
+                }}
+                className="py-1.5 px-2.5 rounded-xl text-xs font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition flex items-center justify-center gap-1 cursor-pointer"
+                title="বইয়ের বিস্তারিত বিবরণ"
+              >
+                <Eye className="w-3.5 h-3.5 text-slate-500" />
+                <span>বিস্তারিত</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  if (onShare) onShare(ebook);
+                }}
+                className="py-1.5 px-2.5 rounded-xl text-xs font-bold text-emerald-800 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 transition flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                title="eBook বন্ধুদের সাথে শেয়ার করুন"
+              >
+                <Share2 className="w-3.5 h-3.5 text-emerald-700" />
+                <span>🔗 শেয়ার</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>

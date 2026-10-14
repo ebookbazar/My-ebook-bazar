@@ -393,10 +393,16 @@ export const MembershipView: React.FC<MembershipViewProps> = ({
         </div>
 
         <div className="pt-4 border-t border-slate-100 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-xs text-slate-600">
-            <Smartphone className="w-4 h-4 text-emerald-700" />
-            <span>সরাসরি সহযোগিতার জন্য হোয়াটসঅ্যাপ করুন: <b className="font-mono text-slate-900">+8801673860659</b></span>
-          </div>
+          <a
+            href="https://wa.me/8801911633056"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-2 text-xs text-slate-600 hover:text-emerald-700 transition-colors group cursor-pointer"
+            title="সরাসরি সহযোগিতার জন্য হোয়াটসঅ্যাপ করুন"
+          >
+            <Smartphone className="w-4 h-4 text-emerald-700 group-hover:scale-110 transition-transform" />
+            <span>সরাসরি সহযোগিতার জন্য হোয়াটসঅ্যাপ করুন: <b className="font-mono text-slate-900 group-hover:text-emerald-700 underline decoration-emerald-500/40 underline-offset-2">+8801911633056</b></span>
+          </a>
           <button
             onClick={onNavigateHome}
             className="text-emerald-700 hover:underline font-black text-xs flex items-center gap-1"
