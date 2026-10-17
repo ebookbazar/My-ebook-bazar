@@ -297,7 +297,7 @@ export const SupportTicketSection: React.FC<SupportTicketSectionProps> = ({
               <span>← সকল টিকিটে ফিরে যান</span>
             </button>
             <div className="flex items-center gap-2">
-              <span className="text-xs font-mono text-slate-500">#{selectedTicket.id.slice(-8).toUpperCase()}</span>
+              <span className="text-xs font-mono text-slate-500">#{String(selectedTicket.id || '').slice(-8).toUpperCase()}</span>
               {renderStatusBadge(selectedTicket.status)}
             </div>
           </div>
@@ -451,7 +451,7 @@ export const SupportTicketSection: React.FC<SupportTicketSectionProps> = ({
                   <div className="space-y-1.5 flex-1 min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="font-mono text-[11px] font-bold text-slate-500">
-                        #{ticket.id.slice(-8).toUpperCase()}
+                        #{String(ticket.id || '').slice(-8).toUpperCase()}
                       </span>
                       <span className="bg-slate-100 text-slate-700 text-[10px] font-bold px-2 py-0.5 rounded">
                         {ticket.category}

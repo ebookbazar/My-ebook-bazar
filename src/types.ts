@@ -354,4 +354,42 @@ export interface AppDownloadStats {
   resetAt?: number;
 }
 
+export interface MarqueeNoticeItem {
+  id: string;
+  text: string;
+  createdAt?: number;
+}
+
+export interface MarqueeSettings {
+  enabled: boolean;
+  text: string;
+  bgColor: string;
+  textColor: string;
+  speed: 'slow' | 'medium' | 'fast';
+  speedDuration?: number;
+  notices?: MarqueeNoticeItem[];
+  updatedAt?: number;
+}
+
+export const DEFAULT_MARQUEE_SETTINGS: MarqueeSettings = {
+  enabled: true,
+  text: '📢 নতুন eBook প্রকাশিত হয়েছে! এখনই দেখে নিন এবং আপনার জ্ঞানের ভাণ্ডার সমৃদ্ধ করুন।',
+  bgColor: '#f0fdf4',
+  textColor: '#064e3b',
+  speed: 'medium',
+  speedDuration: 28,
+  notices: [
+    {
+      id: 'default-1',
+      text: '📢 নতুন eBook প্রকাশিত হয়েছে! এখনই দেখে নিন এবং আপনার জ্ঞানের ভাণ্ডার সমৃদ্ধ করুন।'
+    },
+    {
+      id: 'default-2',
+      text: '📚 EbookBazar-এ eBook পড়ুন, নতুন দক্ষতা শিখুন এবং নিজের eBook বিক্রির সুযোগ তৈরি করুন!'
+    }
+  ],
+  updatedAt: 0
+};
+
+
 

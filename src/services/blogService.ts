@@ -1,6 +1,7 @@
 import { db, ref, onValue, set, push, remove, runTransaction } from '../firebase';
 import { BlogPost } from '../types';
 import { formatBlogContentToHtml } from '../utils/blogFormatter';
+import { BLOG_POSTS } from '../data/blogPosts';
 
 /**
  * Standard categories defined by user request.
@@ -432,6 +433,125 @@ export function addDeletedBlogId(id: string, slug?: string): void {
 /**
  * Retrieve saved blog posts from local storage cache
  */
+/**
+ * Normalizes legacy, Firebase RTDB, and DOM blog post records into a consistent BlogPost object.
+ * Restores compatibility with older database formats where fields might differ:
+ * - title / postTitle / name
+ * - content / htmlContent / description / body / excerpt / summary
+ * - date / publishedDate / publishedAt / createdAt
+ * - category / labels / tags
+ * - views / viewCount / totalViews
+ * - author / creator / authorName / userName
+ * - coverImage / thumbnail / image / imageUrl / featuredImage
+ * - id / slug / url
+ */
+export function normalizeBlogPostRecord(raw: any, fallbackId: string = ''): BlogPost {
+  const targetId = String(raw?.id || fallbackId || `blog-${Date.now()}`);
+  const title = typeof raw?.title === 'string' && raw.title.trim() 
+    ? raw.title.trim() 
+    : (typeof raw?.postTitle === 'string' && raw.postTitle.trim() 
+      ? raw.postTitle.trim() 
+      : (typeof raw?.name === 'string' && raw.name.trim() ? raw.name.trim() : 'শিরোনামহীন ব্লগ পোস্ট'));
+  
+  // Safe author string extraction to prevent any charAt runtime crash
+  const rawAuthor = raw?.author || raw?.creator || raw?.authorName || raw?.userName;
+  const author = typeof rawAuthor === 'string' && rawAuthor.trim() ? rawAuthor.trim() : 'eBookBazar Editor';
+  const authorRole = typeof raw?.authorRole === 'string' && raw.authorRole.trim() ? raw.authorRole.trim() : undefined;
+
+  // Safe category and labels
+  let category = typeof raw?.category === 'string' && raw.category.trim() ? raw.category.trim() : '';
+  const labels: string[] = Array.isArray(raw?.labels) 
+    ? raw.labels.filter(Boolean).map(String) 
+    : (Array.isArray(raw?.tags) ? raw.tags.filter(Boolean).map(String) : []);
+  if (!category) {
+    category = labels[0] || 'অন্যান্য';
+  }
+  if (labels.length === 0 && category) {
+    labels.push(category);
+  }
+
+  // Safe date
+  let date = typeof raw?.date === 'string' && raw.date.trim() ? raw.date.trim() : '';
+  if (!date && typeof raw?.publishedDate === 'string' && raw.publishedDate.trim()) {
+    date = raw.publishedDate.trim();
+  }
+  if (!date && (raw?.createdAt || raw?.publishedAt)) {
+    try {
+      const ts = Number(raw.createdAt || raw.publishedAt);
+      if (!isNaN(ts) && ts > 0) {
+        date = new Date(ts).toLocaleDateString('bn-BD', { year: 'numeric', month: 'long', day: 'numeric' });
+      }
+    } catch {}
+  }
+  if (!date) {
+    date = 'সাম্প্রতিক';
+  }
+
+  // Safe cover image
+  const coverImage = raw?.coverImage || raw?.thumbnail || raw?.image || raw?.imageUrl || raw?.featuredImage || '';
+
+  // Safe content parsing
+  let content: string[] = [];
+  if (Array.isArray(raw?.content)) {
+    content = raw.content.filter((c: any) => typeof c === 'string' && c.trim().length > 0);
+  } else if (typeof raw?.content === 'string' && raw.content.trim()) {
+    content = [raw.content.trim()];
+  } else if (typeof raw?.body === 'string' && raw.body.trim()) {
+    content = [raw.body.trim()];
+  } else if (typeof raw?.description === 'string' && raw.description.trim()) {
+    content = [raw.description.trim()];
+  } else if (typeof raw?.htmlContent === 'string' && raw.htmlContent.trim()) {
+    const stripped = raw.htmlContent.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+    if (stripped) content = [stripped];
+  }
+
+  // Safe excerpt
+  let excerpt = typeof raw?.excerpt === 'string' && raw.excerpt.trim() ? raw.excerpt.trim() : '';
+  if (!excerpt && typeof raw?.summary === 'string' && raw.summary.trim()) {
+    excerpt = raw.summary.trim();
+  }
+  if (!excerpt && content.length > 0) {
+    excerpt = content[0].slice(0, 160) + (content[0].length > 160 ? '...' : '');
+  }
+
+  // Safe slug
+  const slug = typeof raw?.slug === 'string' && raw.slug.trim() 
+    ? raw.slug.trim() 
+    : (typeof raw?.postSlug === 'string' && raw.postSlug.trim() ? raw.postSlug.trim() : targetId);
+
+  // Safe views
+  const rawViews = raw?.views ?? raw?.viewCount ?? raw?.view_count ?? raw?.totalViews;
+  const views = typeof rawViews === 'number' && !isNaN(rawViews) ? rawViews : (Number(rawViews) || 0);
+
+  return {
+    ...raw,
+    id: targetId,
+    title,
+    slug,
+    author,
+    authorRole,
+    date,
+    readTime: raw?.readTime || '৫ মিনিট',
+    category,
+    labels,
+    coverImage,
+    imageAlt: raw?.imageAlt || title,
+    excerpt,
+    content,
+    htmlContent: raw?.htmlContent || undefined,
+    url: raw?.url || undefined,
+    isDemo: false,
+    type: 'POST',
+    status: raw?.status === 'DRAFT' || raw?.status === 'SOFT_TRASHED' ? raw.status : 'LIVE',
+    views,
+    viewCount: views,
+    allowIndex: raw?.allowIndex !== false
+  };
+}
+
+/**
+ * Retrieve saved blog posts from local storage cache
+ */
 export function getLocalStoredBlogs(): BlogPost[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -442,14 +562,9 @@ export function getLocalStoredBlogs(): BlogPost[] {
 
     if (Array.isArray(parsed)) {
       return parsed
-        .filter(item => item && typeof item === 'object' && item.title)
-        .filter(item => !deletedSet.has(item.id) && !(item.slug && deletedSet.has(item.slug)))
-        .map(item => ({
-          ...item,
-          isDemo: false,
-          type: item.type || 'POST',
-          status: item.status || 'LIVE'
-        }));
+        .filter(item => item && typeof item === 'object' && (item.title || item.postTitle || item.name))
+        .map(item => normalizeBlogPostRecord(item, item.id))
+        .filter(item => !deletedSet.has(item.id) && !(item.slug && deletedSet.has(item.slug)));
     }
   } catch (err) {
     console.warn('Failed to parse locally stored blogs:', err);
@@ -493,7 +608,8 @@ export function setLocalHideDemoBlogs(hide: boolean): void {
 }
 
 /**
- * Get initial posts merging Blogger DOM and Local Storage cache
+ * Get initial posts merging base website BLOG_POSTS, Blogger DOM and Local Storage cache.
+ * Restores user's existing posts so the public blog page never displays 'কোনো ব্লগ পোস্ট পাওয়া যায়নি' on open.
  */
 export function getInitialBlogPosts(): BlogPost[] {
   const domPosts = extractBloggerPostsFromDOM();
@@ -501,14 +617,25 @@ export function getInitialBlogPosts(): BlogPost[] {
   const deletedSet = new Set(getDeletedBlogIds());
   
   const map = new Map<string, BlogPost>();
-  domPosts.forEach(p => {
+
+  // 1. Base website published blog posts (Restores all original blog posts)
+  BLOG_POSTS.forEach(p => {
     if (!deletedSet.has(p.id) && !(p.slug && deletedSet.has(p.slug))) {
-      map.set(p.id, p);
+      map.set(p.id, normalizeBlogPostRecord(p, p.id));
     }
   });
+
+  // 2. Blogger DOM posts
+  domPosts.forEach(p => {
+    if (!deletedSet.has(p.id) && !(p.slug && deletedSet.has(p.slug))) {
+      map.set(p.id, normalizeBlogPostRecord(p, p.id));
+    }
+  });
+
+  // 3. Local storage cached posts (includes newly created or edited posts)
   localPosts.forEach(p => {
     if (!deletedSet.has(p.id) && !(p.slug && deletedSet.has(p.slug))) {
-      map.set(p.id, p);
+      map.set(p.id, normalizeBlogPostRecord(p, p.id));
     }
   });
   
@@ -522,28 +649,39 @@ export function getInitialBlogPosts(): BlogPost[] {
  * 3. Also mirrors to Firebase RTDB public node (/ebooks/_blogs) for unauthenticated / logged-out visitors
  */
 export async function saveBlogPostToFirebase(post: Omit<BlogPost, 'id'> & { id?: string }): Promise<string> {
-  const blogsRef = ref(db, 'blogs');
   const status = post.status || 'LIVE';
   const allowIndex = post.allowIndex !== undefined ? post.allowIndex : (status === 'LIVE');
   const now = Date.now();
 
   const isExisting = Boolean(post.id && !post.id.startsWith('post-'));
-  const targetId = isExisting ? (post.id as string) : (push(blogsRef).key || `blog-${now}`);
+  const targetId = isExisting ? (post.id as string) : (push(ref(db, 'ebooks/_blogs')).key || push(ref(db, 'blogs')).key || `blog-${now}`);
+
+  // Preserve existing view count so editing or re-publishing NEVER resets views to 0 (Requirement 10)
+  const existingLocal = getLocalStoredBlogs().find(p => p.id === targetId || (post.slug && p.slug === post.slug));
+  const cachedViews = getLocalBlogViews()[targetId] || (post.slug ? getLocalBlogViews()[post.slug] : 0);
+  const preservedViews = post.views !== undefined 
+    ? post.views 
+    : ((post as any).viewCount !== undefined 
+      ? (post as any).viewCount 
+      : Math.max(existingLocal?.views ?? 0, existingLocal?.viewCount ?? 0, cachedViews ?? 0));
 
   const completePost: BlogPost = {
     ...post,
     id: targetId,
+    author: typeof post.author === 'string' && post.author.trim() ? post.author.trim() : 'eBookBazar Editor',
+    authorRole: typeof post.authorRole === 'string' && post.authorRole.trim() ? post.authorRole.trim() : 'লেখক / ব্লগার',
+    title: typeof post.title === 'string' && post.title.trim() ? post.title.trim() : 'শিরোনামহীন ব্লগ পোস্ট',
     createdAt: (post as any).createdAt || now,
     updatedAt: now,
     isDemo: false,
     type: 'POST',
     status,
     allowIndex,
-    views: post.views !== undefined ? post.views : ((post as any).viewCount || 0),
+    views: preservedViews,
     htmlContent: post.htmlContent ? formatBlogContentToHtml(post.htmlContent) : (post.content ? formatBlogContentToHtml(post.content) : undefined)
   };
 
-  // 1. Immediate local cache write (Dual-Layer persistence guarantee)
+  // 1. Immediate local cache write (Instant feedback on current device)
   try {
     const existing = getLocalStoredBlogs();
     const map = new Map<string, BlogPost>();
@@ -557,21 +695,60 @@ export async function saveBlogPostToFirebase(post: Omit<BlogPost, 'id'> & { id?:
   // 2. Prepare sanitized payload for Firebase RTDB
   const payload = sanitizeObjectForFirebase(completePost);
 
-  // 3. Write to primary /blogs node
-  const singleRef = ref(db, `blogs/${targetId}`);
-  const primaryWrite = set(singleRef, payload).catch((err) => {
-    console.warn('Primary Firebase /blogs write notice:', err);
-  });
+  // 3. Dual-Layer Write:
+  // Write to ebooks/_blogs (Inherits .read: true on all browsers and devices)
+  // AND write to blogs node (Primary node)
+  let writeSuccess = false;
+  let lastError: any = null;
 
-  // 4. Dual-layer mirror to /ebooks/_blogs node (since /ebooks has public read in RTDB)
-  const mirrorRef = ref(db, `ebooks/_blogs/${targetId}`);
-  const mirrorWrite = set(mirrorRef, payload).catch((err) => {
-    console.warn('Mirror Firebase /ebooks/_blogs write notice:', err);
-  });
+  try {
+    const mirrorRef = ref(db, `ebooks/_blogs/${targetId}`);
+    await set(mirrorRef, payload);
+    writeSuccess = true;
+  } catch (err: any) {
+    console.warn('Firebase /ebooks/_blogs write notice:', err?.message || err);
+    lastError = err;
+  }
 
-  await Promise.allSettled([primaryWrite, mirrorWrite]);
+  try {
+    const singleRef = ref(db, `blogs/${targetId}`);
+    await set(singleRef, payload);
+    writeSuccess = true;
+  } catch (err: any) {
+    console.warn('Firebase /blogs write notice:', err?.message || err);
+    if (!lastError) lastError = err;
+  }
+
+  // If both failed, alert caller so admin is not misled by a silent failure
+  if (!writeSuccess && lastError) {
+    console.error('All Firebase blog writes failed:', lastError);
+    throw new Error(`Firebase ডাটাবেসে ব্লগ সেভ করা যায়নি: ${lastError?.message || 'Permission denied'}`);
+  }
 
   return targetId;
+}
+
+/**
+ * Automatically synchronizes any locally created posts on this device to shared Firebase nodes.
+ * Used when an admin logs in to ensure posts authored on one machine propagate to all visitors.
+ */
+export async function syncLocalBlogsToFirebase(): Promise<number> {
+  const localPosts = getLocalStoredBlogs();
+  if (!localPosts || localPosts.length === 0) return 0;
+
+  let synced = 0;
+  for (const post of localPosts) {
+    if (post.isDemo) continue;
+    try {
+      const payload = sanitizeObjectForFirebase(post);
+      await Promise.allSettled([
+        set(ref(db, `ebooks/_blogs/${post.id}`), payload),
+        set(ref(db, `blogs/${post.id}`), payload)
+      ]);
+      synced++;
+    } catch {}
+  }
+  return synced;
 }
 
 /**
@@ -648,81 +825,137 @@ export function saveLocalBlogViews(viewsMap: Record<string, number>): void {
 
 /**
  * Atomically increments the view count for a specific blog post in Firebase Realtime Database.
- * Employs session-based deduplication (one view per article per browser session) to prevent
- * accidental duplicate counts caused by React re-renders, Strict Mode, or page refreshes.
+ * Employs a 15-minute deduplication window per visitor per article to prevent accidental 
+ * duplicate counts caused by React StrictMode, re-renders, or quick page reloads.
+ * Does not count admin preview or unpublished draft views.
  */
-export async function recordBlogArticleView(postId: string): Promise<number | null> {
+export async function recordBlogArticleView(
+  postId: string,
+  options?: { isDraft?: boolean; isAdmin?: boolean }
+): Promise<number | null> {
   if (!postId) return null;
+  // Requirement 13: Do not count admin preview or unpublished drafts as public views
+  if (options?.isDraft || options?.isAdmin) return null;
+
   const cleanId = String(postId).replace(/[.#$[\]]/g, '_').trim();
   if (!cleanId) return null;
 
-  // 1. Session deduplication safeguard
+  // 1. Session-based deduplication window (15 minutes per visitor per article)
   const sessionKey = `eb_viewed_blog_${cleanId}`;
+  const now = Date.now();
+  const DEDUPE_WINDOW_MS = 15 * 60 * 1000;
   if (typeof window !== 'undefined' && window.sessionStorage) {
     try {
-      if (sessionStorage.getItem(sessionKey)) {
-        // Already recorded in this browser session
+      const lastRecorded = sessionStorage.getItem(sessionKey);
+      if (lastRecorded && (now - Number(lastRecorded) < DEDUPE_WINDOW_MS)) {
+        // Already recorded within deduplication window
         return null;
       }
-      sessionStorage.setItem(sessionKey, String(Date.now()));
+      sessionStorage.setItem(sessionKey, String(now));
     } catch {}
   }
 
-  // 2. Concurrency-safe atomic transaction on blogViews/${cleanId}
-  let updatedCount: number | null = null;
-  try {
-    const viewRef = ref(db, `blogViews/${cleanId}`);
-    const res = await runTransaction(viewRef, (current) => {
-      return (Number(current) || 0) + 1;
-    });
+  let finalCount: number | null = null;
 
+  // 2. Concurrency-safe atomic transaction on ebooks/_blogViews/${cleanId}
+  // (Public node accessible to all visitors across devices)
+  try {
+    const mirrorRef = ref(db, `ebooks/_blogViews/${cleanId}`);
+    const res = await runTransaction(mirrorRef, (current) => {
+      const cur = Number(current) || 0;
+      return cur + 1;
+    });
     if (res.committed && res.snapshot.exists()) {
-      updatedCount = Number(res.snapshot.val()) || 1;
+      finalCount = Number(res.snapshot.val()) || 1;
     }
   } catch (err) {
-    console.warn('Firebase RTDB blogViews transaction note:', err);
+    console.warn('Firebase RTDB ebooks/_blogViews transaction notice:', err);
   }
 
-  // 3. Dual-layer mirror to blogs/${cleanId}/views
+  // 3. Concurrency-safe atomic transaction on primary blogViews/${cleanId}
   try {
-    const mirrorRef = ref(db, `blogs/${cleanId}/views`);
-    runTransaction(mirrorRef, (current) => (Number(current) || 0) + 1).catch(() => {});
-  } catch {}
+    const viewRef = ref(db, `blogViews/${cleanId}`);
+    const res2 = await runTransaction(viewRef, (current) => {
+      const cur = Number(current) || 0;
+      return cur + 1;
+    });
+    if ((finalCount === null || !finalCount) && res2.committed && res2.snapshot.exists()) {
+      finalCount = Number(res2.snapshot.val()) || 1;
+    }
+  } catch (err) {
+    // Primary node transaction note
+  }
 
-  // 4. Update local cache
-  if (updatedCount !== null) {
+  // 4. Update local cache immediately
+  if (finalCount !== null) {
     try {
       const localMap = getLocalBlogViews();
-      localMap[cleanId] = updatedCount;
-      localMap[postId] = updatedCount;
+      localMap[cleanId] = finalCount;
+      localMap[postId] = finalCount;
       saveLocalBlogViews(localMap);
     } catch {}
   }
 
-  return updatedCount;
+  // 5. Dual-layer mirror to post document views field if permissions allow
+  try {
+    runTransaction(ref(db, `ebooks/_blogs/${cleanId}/views`), (c) => (Number(c) || 0) + 1).catch(() => {});
+    runTransaction(ref(db, `blogs/${cleanId}/views`), (c) => (Number(c) || 0) + 1).catch(() => {});
+  } catch {}
+
+  return finalCount;
 }
 
 /**
- * Subscribes in real time to the blogViews node in Firebase RTDB,
- * ensuring all public cards and article pages display the same persistent total.
+ * Subscribes in real time to the blog views across all Firebase RTDB nodes
+ * (ebooks/_blogViews and blogViews), ensuring all public cards and article pages 
+ * display the same persistent total synchronized across all devices and browsers.
  */
 export function subscribeToAllBlogViews(callback: (viewsMap: Record<string, number>) => void): () => void {
-  const viewsRef = ref(db, 'blogViews');
-  const unsub = onValue(viewsRef, (snap) => {
-    const map: Record<string, number> = { ...getLocalBlogViews() };
-    if (snap.exists()) {
-      const val = snap.val() || {};
+  const currentMap: Record<string, number> = { ...getLocalBlogViews() };
+
+  const mergeAndNotify = (val: any) => {
+    if (val && typeof val === 'object') {
+      let changed = false;
       for (const [k, v] of Object.entries(val)) {
-        map[k] = Math.max(Number(v) || 0, map[k] || 0);
+        const num = Number(v) || 0;
+        if (num > (currentMap[k] || 0)) {
+          currentMap[k] = num;
+          changed = true;
+        }
       }
-      saveLocalBlogViews(map);
+      if (changed) {
+        saveLocalBlogViews(currentMap);
+        callback({ ...currentMap });
+      }
     }
-    callback(map);
+  };
+
+  // Immediate callback with cached views to prevent UI delay
+  callback({ ...currentMap });
+
+  // 1. Listen to ebooks/_blogViews (publicly accessible node)
+  const mirrorViewsRef = ref(db, 'ebooks/_blogViews');
+  const unsubMirror = onValue(mirrorViewsRef, (snap) => {
+    if (snap.exists()) {
+      mergeAndNotify(snap.val());
+    }
   }, (err) => {
-    console.warn('Firebase RTDB blogViews listener note:', err?.message);
-    callback(getLocalBlogViews());
+    console.warn('Firebase RTDB ebooks/_blogViews listener note:', err?.message);
   });
 
-  return unsub;
+  // 2. Listen to primary blogViews
+  const primaryViewsRef = ref(db, 'blogViews');
+  const unsubPrimary = onValue(primaryViewsRef, (snap) => {
+    if (snap.exists()) {
+      mergeAndNotify(snap.val());
+    }
+  }, (err) => {
+    // Primary node restricted or pending rules
+  });
+
+  return () => {
+    unsubMirror();
+    unsubPrimary();
+  };
 }
 

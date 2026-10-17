@@ -641,7 +641,9 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
                           <div className="flex items-start justify-between">
                             <div className="flex items-center gap-2.5">
                               <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-black text-xs shadow-xs">
-                                {rev.userName ? rev.userName.charAt(0).toUpperCase() : 'U'}
+                                {typeof rev.userName === 'string' && rev.userName.trim().length > 0
+                                  ? rev.userName.trim().charAt(0).toUpperCase()
+                                  : 'U'}
                               </div>
                               <div>
                                 <h5 className="font-black text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">

@@ -211,3 +211,22 @@ export function formatBlogViewCountShort(count?: number | null): string {
     return `${safeCount.toLocaleString()} ভিউ`;
   }
 }
+
+/**
+ * Resolves the effective view count from real-time database views map or post document
+ */
+export function getEffectiveBlogViews(
+  post?: { id: string; slug?: string; views?: number; viewCount?: number } | null, 
+  blogViews?: Record<string, number>
+): number {
+  if (!post) return 0;
+  if (blogViews) {
+    if (typeof blogViews[post.id] === 'number') {
+      return blogViews[post.id];
+    }
+    if (post.slug && typeof blogViews[post.slug] === 'number') {
+      return blogViews[post.slug];
+    }
+  }
+  return Number(post.views ?? post.viewCount ?? 0) || 0;
+}

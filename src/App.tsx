@@ -29,7 +29,10 @@ import { EbookCard } from './components/EbookCard';
 import { EbookSalesHero } from './components/EbookSalesHero';
 import { EbookShareModal } from './components/EbookShareModal';
 import { RealWebsiteStats } from './components/RealWebsiteStats';
-import { AppDownloadBanner } from './components/AppDownloadBanner';
+import { HomeMarquee } from './components/HomeMarquee';
+import { HomePrimaryNavCards } from './components/HomePrimaryNavCards';
+import { EbooksCatalogView } from './components/EbooksCatalogView';
+import { recordAppDownloadClick, formatAndValidateDownloadUrl } from './services/appDownloadService';
 
 // Dynamic lazy-loaded views, widgets & heavy modals for lightning-fast initial page load
 const EbookDetailModal = lazy(() => import('./components/EbookDetailModal').then(m => ({ default: m.EbookDetailModal })));
@@ -73,15 +76,19 @@ import {
   getLocalHideDemoBlogs,
   setLocalHideDemoBlogs,
   getInitialBlogPosts,
-  getDeletedBlogIds
+  getDeletedBlogIds,
+  subscribeToAllBlogViews,
+  getLocalBlogViews,
+  syncLocalBlogsToFirebase,
+  normalizeBlogPostRecord
 } from './services/blogService';
-import { Ebook, BlogPost, AppDownloadSettings, DEFAULT_APP_DOWNLOAD_SETTINGS, EbookRatingSummary } from './types';
+import { Ebook, BlogPost, AppDownloadSettings, DEFAULT_APP_DOWNLOAD_SETTINGS, EbookRatingSummary, MarqueeSettings, DEFAULT_MARQUEE_SETTINGS } from './types';
 import { INITIAL_EBOOKS } from './data/initialEbooks';
 import { BLOG_POSTS } from './data/blogPosts';
 import { db, ref, onValue, set, update } from './firebase';
 import { subscribeToAllRatingSummaries, getLocalRatingSummaries } from './services/ratingService';
 import { getOptimizedImageUrl } from './utils/imageOptimizer';
-import { formatBlogViewCount } from './utils/blogFormatter';
+import { formatBlogViewCount, getEffectiveBlogViews } from './utils/blogFormatter';
 
 const CATEGORIES = [
   'সব বই',
@@ -169,12 +176,25 @@ function MainApp() {
   // Dynamic Blog Posts (Blogger DOM Bridge + Local Storage Cache + Firebase RTDB + Demo fallback)
   const [hideDemoBlogs, setHideDemoBlogs] = useState<boolean>(() => getLocalHideDemoBlogs());
   const [isAdminBlogManagerOpen, setIsAdminBlogManagerOpen] = useState<boolean>(false);
+  const [isBlogsLoading, setIsBlogsLoading] = useState<boolean>(true);
+  const [blogsError, setBlogsError] = useState<string | null>(null);
+
+  // Real-time Blog Views synchronized across all devices and browsers
+  const [blogViews, setBlogViews] = useState<Record<string, number>>(() => getLocalBlogViews());
 
   const [blogPosts, setBlogPosts] = useState<BlogPost[]>(() => {
     const initialReal = getInitialBlogPosts();
     // Only return real published blog posts from database/cache/DOM, never demo fallback
     return initialReal.filter(p => !p.isDemo);
   });
+
+  // Subscribe to real-time blog views
+  useEffect(() => {
+    const unsub = subscribeToAllBlogViews((map) => {
+      setBlogViews(map);
+    });
+    return () => unsub();
+  }, []);
 
   // Ebooks from Firebase + Initial Fallback
   const [ebooks, setEbooks] = useState<Ebook[]>(INITIAL_EBOOKS);
@@ -204,6 +224,20 @@ function MainApp() {
 
   // App Download Settings from Realtime Database
   const [appDownloadSettings, setAppDownloadSettings] = useState<AppDownloadSettings>(DEFAULT_APP_DOWNLOAD_SETTINGS);
+
+  // Home Page Marquee Settings from Realtime Database & Local Cache
+  const [marqueeSettings, setMarqueeSettings] = useState<MarqueeSettings>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ebookbazar_marquee_settings');
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return DEFAULT_MARQUEE_SETTINGS;
+  });
+
+  // Friendly in-app feedback toast for App Download
+  const [appDownloadMessage, setAppDownloadMessage] = useState<string | null>(null);
 
   // Defer non-critical floating widgets (LiveChat, QuickSearch) slightly so initial FCP/LCP have 100% network bandwidth
   const [deferredWidgetsReady, setDeferredWidgetsReady] = useState(false);
@@ -319,6 +353,39 @@ function MainApp() {
       unsubAppDownload2();
     };
   }, [isAdmin]);
+
+  // Realtime synchronization for Marquee Announcement Settings
+  useEffect(() => {
+    const handleMarqueeSnap = (snap: any) => {
+      if (snap.exists()) {
+        const val = snap.val();
+        if (val && typeof val === 'object') {
+          const merged: MarqueeSettings = {
+            enabled: val.enabled !== false,
+            text: val.text || DEFAULT_MARQUEE_SETTINGS.text,
+            bgColor: val.bgColor || DEFAULT_MARQUEE_SETTINGS.bgColor,
+            textColor: val.textColor || DEFAULT_MARQUEE_SETTINGS.textColor,
+            speed: val.speed || DEFAULT_MARQUEE_SETTINGS.speed,
+            updatedAt: val.updatedAt || Date.now()
+          };
+          setMarqueeSettings(merged);
+          if (typeof window !== 'undefined') {
+            try {
+              localStorage.setItem('ebookbazar_marquee_settings', JSON.stringify(merged));
+            } catch {}
+          }
+        }
+      }
+    };
+
+    const unsubMarquee0 = onValue(ref(db, 'ebooks/_marquee'), handleMarqueeSnap, () => {});
+    const unsubMarquee1 = onValue(ref(db, 'settings/marquee'), handleMarqueeSnap, () => {});
+
+    return () => {
+      unsubMarquee0();
+      unsubMarquee1();
+    };
+  }, []);
   
   // Search & Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -393,8 +460,21 @@ function MainApp() {
       }
     }).catch(() => {});
 
+    let blogsReceived = false;
+    let blogsErr = false;
+    let mirrorErr = false;
+
+    // Safety timeout: ensure loading state does not spin indefinitely
+    const loadTimeout = setTimeout(() => {
+      setIsBlogsLoading(false);
+    }, 3000);
+
     // Common snapshot processor for Firebase blog nodes
     const handleFirebaseBlogsSnapshot = (snap: any) => {
+      clearTimeout(loadTimeout);
+      setIsBlogsLoading(false);
+      setBlogsError(null);
+      blogsReceived = true;
       if (!snap.exists()) return;
       const val = snap.val();
       if (!val || typeof val !== 'object') return;
@@ -402,11 +482,7 @@ function MainApp() {
       const deletedSet = new Set(getDeletedBlogIds());
       const fbPosts: BlogPost[] = Object.keys(val)
         .filter(key => !deletedSet.has(key))
-        .map(key => ({
-          ...val[key],
-          id: key,
-          isDemo: false
-        }))
+        .map(key => normalizeBlogPostRecord(val[key], key))
         .filter(p => !deletedSet.has(p.id) && !(p.slug && deletedSet.has(p.slug)));
 
       setBlogPosts(prev => {
@@ -426,12 +502,22 @@ function MainApp() {
     const blogsRef = ref(db, 'blogs');
     const unsubBlogs = onValue(blogsRef, handleFirebaseBlogsSnapshot, (err) => {
       console.warn('Firebase RTDB /blogs read restricted (using mirror/cache fallback):', err?.message);
+      blogsErr = true;
+      if (mirrorErr && !blogsReceived) {
+        setIsBlogsLoading(false);
+        setBlogsError('Firebase থেকে ব্লগ পোস্ট লোড করা যাচ্ছে না। পারমিশন বা নেটওয়ার্ক সমস্যা হতে পারে।');
+      }
     });
 
     // 4. Dual-Layer Public Mirror /ebooks/_blogs listener (Publicly accessible in RTDB for all visitors & post-logout)
     const mirrorBlogsRef = ref(db, 'ebooks/_blogs');
     const unsubMirrorBlogs = onValue(mirrorBlogsRef, handleFirebaseBlogsSnapshot, (err) => {
       console.warn('Firebase RTDB /ebooks/_blogs mirror notice:', err?.message);
+      mirrorErr = true;
+      if (blogsErr && !blogsReceived) {
+        setIsBlogsLoading(false);
+        setBlogsError('Firebase থেকে ব্লগ পোস্ট লোড করা যাচ্ছে না। পারমিশন বা নেটওয়ার্ক সমস্যা হতে পারে।');
+      }
     });
 
     // 5. Settings for hideDemoBlogs (Both primary and mirror nodes)
@@ -459,12 +545,20 @@ function MainApp() {
     }
 
     return () => {
+      clearTimeout(loadTimeout);
       unsubBlogs();
       unsubMirrorBlogs();
       unsubHideDemo();
       unsubMirrorHideDemo();
     };
   }, []);
+
+  // When admin is authenticated, automatically sync any local posts to Firebase nodes
+  useEffect(() => {
+    if (isAdmin) {
+      syncLocalBlogsToFirebase().catch(() => {});
+    }
+  }, [isAdmin]);
 
   // Filter blog posts (Displays ONLY REAL published posts from database, strictly excludes demo, PAGE, and SOFT_TRASHED/DRAFT)
   const displayedBlogPosts = useMemo(() => {
@@ -521,14 +615,21 @@ function MainApp() {
           setSelectedBlogPost(null);
           setBlogNotFoundSlug(null);
         }
-      } else if (pathname === '/' || pathname === '/home' || pathname === '') {
-        // Only reset if currently on blog view
+      } else if (pathname === '/ebooks' || pathname.startsWith('/ebooks/')) {
         setSelectedBlogPost(null);
         setBlogNotFoundSlug(null);
-        setCurrentView(prev => (prev === 'blog' ? 'home' : prev));
-      } else if (pathname === '/admin' || pathname.startsWith('/admin/')) {
-        setIsAdminOpen(true);
+        setCurrentView('ebooks');
+      } else if (pathname === '/affiliate' || pathname.startsWith('/affiliate/')) {
+        setSelectedBlogPost(null);
+        setBlogNotFoundSlug(null);
+        setCurrentView('affiliate');
+      } else if (pathname === '/membership' || pathname.startsWith('/membership/')) {
+        setSelectedBlogPost(null);
+        setBlogNotFoundSlug(null);
+        setCurrentView('membership');
       } else if (pathname === '/tools' || pathname.startsWith('/tools/')) {
+        setSelectedBlogPost(null);
+        setBlogNotFoundSlug(null);
         setCurrentView('tools');
         const sub = pathname.replace('/tools', '').replace(/^\//, '').replace(/\/$/, '').trim();
         if (sub) {
@@ -536,6 +637,20 @@ function MainApp() {
         } else {
           setSelectedToolId(null);
         }
+      } else if (pathname === '/' || pathname === '/home' || pathname === '') {
+        setSelectedBlogPost(null);
+        setBlogNotFoundSlug(null);
+        setCurrentView('home');
+      } else if (pathname === '/admin' || pathname.startsWith('/admin/')) {
+        setIsAdminOpen(true);
+      } else if (pathname === '/checkout' || pathname.startsWith('/checkout/')) {
+        setCurrentView('checkout');
+      } else if (pathname === '/dashboard' || pathname === '/user-dashboard') {
+        setCurrentView('user-dashboard');
+      } else if (pathname === '/seller' || pathname === '/seller-dashboard') {
+        setCurrentView('seller-dashboard');
+      } else if (pathname === '/library') {
+        setCurrentView('library');
       }
 
       // 4. Synchronize direct eBook Details URL (?ebook=id, ?book=id, or /ebook/id)
@@ -761,309 +876,147 @@ function MainApp() {
       <main className="flex-1 container mx-auto px-4 max-w-7xl pt-4 space-y-6">
         {/* VIEW 1: HOME MARKETPLACE */}
         {currentView === 'home' && (
-          <div className="space-y-6 md:space-y-8">
-            {/* 3. Existing App Download Section (Header-এর ঠিক নিচে ও Hero-এর উপরে) */}
-            <AppDownloadBanner
-              title={appDownloadSettings.appDownloadTitle}
-              text={appDownloadSettings.appDownloadText}
-              url={appDownloadSettings.downloadUrl || appDownloadSettings.url || appDownloadSettings.appDownloadUrl || ''}
-              active={appDownloadSettings.active !== false && appDownloadSettings.appDownloadEnabled !== false}
-              enabled={appDownloadSettings.active !== false && appDownloadSettings.appDownloadEnabled !== false}
-            />
-
-            {/* 4. Professional Sales Hero Banner */}
+          <div className="space-y-6 md:space-y-8 pb-10">
+            {/* 1. Promotional Sales Hero Banner (Immediately below Header) */}
             <EbookSalesHero
-              ebooks={ebooks}
               onExploreEbooks={() => {
-                const el = document.getElementById('curated-picks') || document.getElementById('ebook-categories');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
+                setCurrentView('ebooks');
+                if (typeof window !== 'undefined') {
+                  const ebooksUrl = `${getAppBaseUrl()}/ebooks`;
+                  if (window.location.pathname !== ebooksUrl) {
+                    window.history.pushState({}, '', ebooksUrl);
+                  }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              onViewCurated={() => {
-                const el = document.getElementById('curated-picks');
-                if (el) el.scrollIntoView({ behavior: 'smooth' });
+              onSellEbook={() => {
+                if (userProfile?.role === 'seller') {
+                  setCurrentView('seller-dashboard');
+                } else {
+                  setAuthInitialMode('seller-register');
+                  setIsAuthOpen(true);
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
-              onSelectBook={handleSelectEbook}
+              onViewAffiliate={() => {
+                setCurrentView('affiliate');
+                if (typeof window !== 'undefined') {
+                  const affiliateUrl = `${getAppBaseUrl()}/affiliate`;
+                  if (window.location.pathname !== affiliateUrl) {
+                    window.history.pushState({}, '', affiliateUrl);
+                  }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
             />
 
-            {/* 5. "আপনার জন্য বাছাই করা eBook" Section & 6. Preserve all 6 existing selected eBook cards */}
-            <section id="curated-picks" aria-label="আপনার জন্য বাছাই করা eBook" className="space-y-4 pt-1">
-              <div id="ebooks-catalog" className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-2 pb-1">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black tracking-wide mb-1.5">
-                    <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>বাছাইকৃত ডিজিটাল বই</span>
-                  </div>
-                  <h2 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-900 flex items-center gap-2">
-                    <span>আপনার জন্য বাছাই করা eBook</span>
-                    <span className="text-sm md:text-base font-bold text-slate-500">
-                      ({filteredEbooks.length}টি)
-                    </span>
-                  </h2>
-                  <p className="text-xs sm:text-sm text-slate-600 mt-0.5 font-medium">
-                    স্কিল ডেভেলপমেন্ট, প্রোগ্রামিং ও ক্যারিয়ার গড়ার জন্য সর্বাধিক পছন্দের ৬টি সেরা ডিজিটাল বই
-                  </p>
-                </div>
-              </div>
-
-              {filteredEbooks.length === 0 ? (
-                <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-3">
-                  <BookOpen className="w-12 h-12 text-slate-300 mx-auto" />
-                  <h3 className="font-black text-slate-800 text-lg">কোনো বই পাওয়া যায়নি</h3>
-                  <p className="text-sm text-slate-500 max-w-sm mx-auto">
-                    আপনার সার্চ কি-ওয়ার্ড অথবা ক্যাটাগরি ফিল্টার পরিবর্তন করে পুনরায় চেষ্টা করুন।
-                  </p>
-                  <button
-                    onClick={() => { setSelectedCategory('সব বই'); setSearchQuery(''); setSelectedLevel('all'); }}
-                    className="bg-emerald-700 hover:bg-emerald-800 text-white text-sm font-bold px-5 py-2.5 rounded-xl transition cursor-pointer"
-                  >
-                    সব বই দেখুন
-                  </button>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-3 lg:grid-cols-6 gap-3.5 sm:gap-4 md:gap-5">
-                  {filteredEbooks.map((book) => (
-                    <EbookCard
-                      key={book.id}
-                      ebook={book}
-                      onViewDetails={handleSelectEbook}
-                      onBuyNow={handleBuyNow}
-                      onShare={(b) => setEbookToShare(b)}
-                      ratingSummary={ratingSummaries[book.id]}
-                    />
-                  ))}
-                </div>
-              )}
-            </section>
-
-            {/* 7. Existing eBook Categories & Search Filter */}
-            <div id="ebook-categories" className="bg-white rounded-3xl p-6 md:p-8 shadow-sm border border-slate-200/80 space-y-6">
-              <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                  <h2 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-900 tracking-tight">
-                    সেরা বাংলা ই-বুক মার্কেটপ্লেস
-                  </h2>
-                  <p className="text-sm md:text-base text-slate-600 mt-1 font-medium">
-                    স্কিল ডেভেলপমেন্ট, প্রোগ্রামিং, সাহিত্য ও ক্যারিয়ার প্রস্তুতিমূলক ডিজিটাল বই
-                  </p>
-                </div>
-
-                {/* Search Input */}
-                <div className="relative w-full md:w-88">
-                  <input
-                    type="text"
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="বইয়ের নাম বা লেখক খুঁজুন..."
-                    className="w-full pl-11 pr-5 py-3 bg-slate-50 border border-slate-300 rounded-2xl text-sm md:text-base font-medium focus:outline-none focus:ring-2 focus:ring-emerald-600 focus:bg-white transition"
-                  />
-                  <Search className="w-5 h-5 text-slate-400 absolute left-3.5 top-3.5" />
-                  {searchQuery && (
-                    <button 
-                      onClick={() => setSearchQuery('')}
-                      className="absolute right-3.5 top-3 text-sm font-bold text-slate-400 hover:text-slate-600 cursor-pointer"
-                    >
-                      ✕
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* জনপ্রিয় বিভাগ (Categories Scrolling Badges) */}
-              <div className="space-y-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="w-2 h-2 rounded-full bg-emerald-600"></span>
-                  <h3 className="text-xs sm:text-sm font-black text-slate-800 uppercase tracking-wide">
-                    জনপ্রিয় বিভাগ
-                  </h3>
-                </div>
-                <div className="flex items-center gap-2.5 overflow-x-auto pb-2 scrollbar-none text-sm font-bold">
-                  {CATEGORIES.map((cat) => (
-                    <button
-                      key={cat}
-                      onClick={() => {
-                        setSelectedCategory(cat);
-                        const el = document.getElementById('curated-picks');
-                        if (el) el.scrollIntoView({ behavior: 'smooth' });
-                      }}
-                      className={`px-4 py-2.5 rounded-xl whitespace-nowrap transition-all duration-200 shadow-xs cursor-pointer ${
-                        selectedCategory === cat
-                          ? 'bg-[#15803d] text-white shadow-emerald-700/25 ring-2 ring-emerald-600'
-                          : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
-                      }`}
-                    >
-                      {cat}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Secondary Level & Sort Filter Row */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs sm:text-sm font-semibold text-slate-600">
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-500">লেভেল:</span>
-                  <div className="flex gap-1.5">
-                    {['all', 'Beginner', 'Intermediate', 'Advanced'].map((lvl) => (
-                      <button
-                        key={lvl}
-                        onClick={() => setSelectedLevel(lvl)}
-                        className={`px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition cursor-pointer ${
-                          selectedLevel === lvl 
-                            ? 'bg-slate-900 text-white' 
-                            : 'bg-slate-100 hover:bg-slate-200 text-slate-700'
-                        }`}
-                      >
-                        {lvl === 'all' ? 'সকল লেভেল' : lvl}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-slate-500">সাজান:</span>
-                  <select
-                    value={sortBy}
-                    onChange={(e) => setSortBy(e.target.value as any)}
-                    className="bg-slate-100 border border-slate-200 text-slate-700 font-bold rounded-xl px-3 py-2 text-xs sm:text-sm focus:outline-none focus:ring-1 focus:ring-emerald-600"
-                  >
-                    <option value="latest">নতুন বই আগে</option>
-                    <option value="price-low">মূল্য: কম থেকে বেশি</option>
-                    <option value="price-high">মূল্য: বেশি থেকে কম</option>
-                  </select>
-                </div>
-              </div>
-            </div>
-
-            {/* 10. Existing Tools & Calculators Section */}
-            <div id="free-tools">
-              <HomeFreeToolsSection
-                tools={freeTools}
-                onOpenTool={(toolId) => {
-                  setSelectedToolId(toolId);
-                  setCurrentView('tools');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-                onOpenAllTools={() => {
-                  setSelectedToolId(null);
-                  setCurrentView('tools');
-                  window.scrollTo({ top: 0, behavior: 'smooth' });
-                }}
-              />
-            </div>
-
-            {/* 11. Live Website Stats & Latest Blog Posts */}
-            <RealWebsiteStats
-              totalEbooks={ebooks ? ebooks.length : null}
-              totalUsers={totalUsersCount}
-              totalSellers={totalSellersCount}
+            {/* 2. Scrolling Announcement Marquee (Immediately below Hero Banner) */}
+            <HomeMarquee
+              settings={marqueeSettings}
+              isAdmin={currentUser?.email === 'suma47083@gmail.com' || userProfile?.role === 'admin' || currentUser?.email === 'admin@ebookbazar.com' || currentUser?.email === 'redx0187@gmail.com'}
+              onOpenAdminSettings={() => setIsAdminOpen(true)}
             />
 
-            {/* 11c. সর্বশেষ লেখা (Featured Real Blog Posts Section on Home, exactly 3 latest articles) */}
-            <div className="pt-8 border-t border-slate-200 space-y-6">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                <div>
-                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs font-black tracking-wide mb-1">
-                    <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
-                    <span>ব্লগার লাইভ পোস্ট</span>
-                  </div>
-                  <h2 className="text-xl md:text-2xl lg:text-3xl font-black text-slate-900 flex items-center gap-2.5">
-                    <span>সর্বশেষ লেখা</span>
-                  </h2>
-                  <p className="text-sm md:text-base text-slate-600 mt-1 font-medium">
-                    ক্যারিয়ার, স্কিল ডেভেলপমেন্ট ও বাস্তব অভিজ্ঞতার সর্বশেষ ৩টি প্রকাশিত ব্লগ
-                  </p>
-                </div>
-                <button
-                  onClick={() => {
-                    setCurrentView('blog');
-                    setSelectedBlogPost(null);
-                    setBlogNotFoundSlug(null);
-                    if (typeof window !== 'undefined') {
-                      const blogUrl = `${getAppBaseUrl()}/blog`;
-                      if (window.location.pathname !== blogUrl) {
-                        window.history.pushState({}, '', blogUrl);
-                      }
-                    }
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
-                  className="text-emerald-800 hover:text-emerald-950 font-black text-sm md:text-base flex items-center gap-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-300 px-5 py-2.5 rounded-2xl transition shadow-xs"
-                >
-                  <span>সব ব্লগ পোস্ট দেখুন</span>
-                  <ArrowRight className="w-4 h-4" />
-                </button>
-              </div>
-
-              {displayedBlogPosts.length === 0 ? (
-                <div className="bg-white rounded-3xl p-10 sm:p-12 text-center border border-slate-200 space-y-4 shadow-xs">
-                  <div className="w-14 h-14 bg-emerald-50 rounded-2xl flex items-center justify-center mx-auto text-emerald-700">
-                    <BookOpen className="w-7 h-7" />
-                  </div>
-                  <h3 className="text-lg sm:text-xl font-bold text-slate-800">এখনও কোনো ব্লগ পোস্ট প্রকাশিত হয়নি</h3>
-                  <p className="text-xs sm:text-sm text-slate-500 max-w-md mx-auto">
-                    খুব শীঘ্রই আমাদের নতুন তথ্যবহুল ব্লগ পোস্ট ও ক্যারিয়ার গাইড প্রকাশিত হবে।
-                  </p>
-                </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {displayedBlogPosts.slice(0, 3).map((post) => (
-                    <div 
-                      key={post.id}
-                      onClick={() => handleOpenBlog(post)}
-                      className="bg-white rounded-3xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between cursor-pointer group hover:-translate-y-1 subtle-card-hover"
-                    >
-                      <div>
-                        <div className="aspect-[16/10] overflow-hidden bg-slate-100 relative">
-                          <img 
-                            src={getOptimizedImageUrl(post.coverImage, { width: 440, height: 275, quality: 72 })} 
-                            alt={post.imageAlt || post.title}
-                            width={400}
-                            height={250}
-                            decoding="async"
-                            className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" 
-                            loading="lazy"
-                          />
-                          <span className="absolute top-3 left-3 bg-[#15803d]/95 backdrop-blur-md text-white text-xs font-black px-3 py-1 rounded-xl shadow-md border border-emerald-500/30">
-                            {post.category}
-                          </span>
-                        </div>
-
-                        <div className="p-5 sm:p-6 space-y-3">
-                          <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-500 font-semibold">
-                            <span className="flex items-center gap-1.5">
-                              <Calendar className="w-4 h-4 text-emerald-600" />
-                              <span>{post.date}</span>
-                            </span>
-                            <span className="flex items-center gap-1.5">
-                              <Clock className="w-4 h-4 text-emerald-600" />
-                              <span>{post.readTime}</span>
-                            </span>
-                            <span className="flex items-center gap-1.5 text-slate-600 font-bold" title="মোট পাঠ বা ভিউ সংখ্যা">
-                              <Eye className="w-4 h-4 text-emerald-600" />
-                              <span>{formatBlogViewCount(post.views ?? post.viewCount ?? 0)}</span>
-                            </span>
-                          </div>
-
-                          <h3 className="font-black text-slate-900 text-base sm:text-lg lg:text-xl leading-snug group-hover:text-emerald-700 transition">
-                            {post.title}
-                          </h3>
-
-                          <p className="text-xs sm:text-sm md:text-base text-slate-600 leading-relaxed line-clamp-3 font-medium">
-                            {post.excerpt}
-                          </p>
-                        </div>
-                      </div>
-
-                      <div className="p-5 sm:p-6 pt-0 border-t border-slate-100 flex items-center justify-between text-xs sm:text-sm md:text-base">
-                        <span className="text-xs sm:text-sm text-slate-500 font-bold">{post.author}</span>
-                        <span className="text-emerald-700 font-black flex items-center gap-1 group-hover:translate-x-1.5 transition-transform">
-                          সম্পূর্ণ পড়ুন <ArrowRight className="w-4 h-4" />
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* 3. Six Main Navigation Cards */}
+            <HomePrimaryNavCards
+              onOpenEbooks={() => {
+                setCurrentView('ebooks');
+                if (typeof window !== 'undefined') {
+                  const ebooksUrl = `${getAppBaseUrl()}/ebooks`;
+                  if (window.location.pathname !== ebooksUrl) {
+                    window.history.pushState({}, '', ebooksUrl);
+                  }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenAffiliate={() => {
+                setCurrentView('affiliate');
+                if (typeof window !== 'undefined') {
+                  const affiliateUrl = `${getAppBaseUrl()}/affiliate`;
+                  if (window.location.pathname !== affiliateUrl) {
+                    window.history.pushState({}, '', affiliateUrl);
+                  }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenMembership={() => {
+                setCurrentView('membership');
+                if (typeof window !== 'undefined') {
+                  const membershipUrl = `${getAppBaseUrl()}/membership`;
+                  if (window.location.pathname !== membershipUrl) {
+                    window.history.pushState({}, '', membershipUrl);
+                  }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenBlog={() => {
+                setCurrentView('blog');
+                setSelectedBlogPost(null);
+                setBlogNotFoundSlug(null);
+                if (typeof window !== 'undefined') {
+                  const blogUrl = `${getAppBaseUrl()}/blog`;
+                  if (window.location.pathname !== blogUrl) {
+                    window.history.pushState({}, '', blogUrl);
+                  }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenTools={() => {
+                setSelectedToolId(null);
+                setCurrentView('tools');
+                if (typeof window !== 'undefined') {
+                  const toolsUrl = `${getAppBaseUrl()}/tools`;
+                  if (window.location.pathname !== toolsUrl) {
+                    window.history.pushState({}, '', toolsUrl);
+                  }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
+              onOpenAppDownload={() => {
+                const rawUrl = (appDownloadSettings.downloadUrl || appDownloadSettings.url || appDownloadSettings.appDownloadUrl || '').trim();
+                const validation = formatAndValidateDownloadUrl(rawUrl);
+                const targetUrl = validation.isValid && validation.formattedUrl ? validation.formattedUrl : rawUrl;
+                const isEnabled = appDownloadSettings.active !== false && appDownloadSettings.appDownloadEnabled !== false && Boolean(targetUrl);
+                if (targetUrl && isEnabled) {
+                  recordAppDownloadClick().catch(() => {});
+                  window.open(targetUrl, '_blank', 'noopener,noreferrer');
+                } else {
+                  setAppDownloadMessage('এডমিন প্যানেলে এখনও App Download লিঙ্ক কনফিগার করা হয়নি অথবা নিষ্ক্রিয় আছে। খুব শীঘ্রই লিঙ্কটি সক্রিয় করা হবে।');
+                }
+              }}
+              appDownloadSettings={appDownloadSettings}
+            />
           </div>
+        )}
+
+        {/* VIEW 1b: DEDICATED EBOOKS LISTING PAGE */}
+        {currentView === 'ebooks' && (
+          <EbooksCatalogView
+            ebooks={ebooks}
+            searchQuery={searchQuery}
+            setSearchQuery={setSearchQuery}
+            selectedCategory={selectedCategory}
+            setSelectedCategory={setSelectedCategory}
+            selectedLevel={selectedLevel}
+            setSelectedLevel={setSelectedLevel}
+            sortBy={sortBy}
+            setSortBy={setSortBy}
+            categories={CATEGORIES}
+            onViewDetails={handleSelectEbook}
+            onBuyNow={handleBuyNow}
+            onShare={(b) => setEbookToShare(b)}
+            ratingSummaries={ratingSummaries}
+            onNavigateHome={() => {
+              setCurrentView('home');
+              if (typeof window !== 'undefined') {
+                const homeUrl = `${getAppBaseUrl()}/`;
+                if (window.location.pathname !== homeUrl) {
+                  window.history.pushState({}, '', homeUrl);
+                }
+              }
+              window.scrollTo({ top: 0, behavior: 'smooth' });
+            }}
+          />
         )}
 
         {/* VIEW 2: BLOG */}
@@ -1096,6 +1049,9 @@ function MainApp() {
                 }
               }}
               onOpenAdminBlogManager={() => setIsAdminBlogManagerOpen(true)}
+              blogViews={blogViews}
+              isLoading={isBlogsLoading}
+              error={blogsError}
             />
           </Suspense>
         )}
@@ -1413,7 +1369,16 @@ function MainApp() {
         {currentView === 'membership' && (
           <Suspense fallback={<ViewLoadingFallback />}>
             <MembershipView
-              onNavigateHome={() => setCurrentView('home')}
+              onNavigateHome={() => {
+                setCurrentView('home');
+                if (typeof window !== 'undefined') {
+                  const homeUrl = `${getAppBaseUrl()}/`;
+                  if (window.location.pathname !== homeUrl) {
+                    window.history.pushState({}, '', homeUrl);
+                  }
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               onOpenSellerDashboard={() => setCurrentView('seller-dashboard')}
               onOpenAuth={(mode) => {
                 setAuthInitialMode(mode);
@@ -1509,6 +1474,12 @@ function MainApp() {
               onSelectTool={(toolId) => setSelectedToolId(toolId)}
               onNavigateHome={() => {
                 setCurrentView('home');
+                if (typeof window !== 'undefined') {
+                  const homeUrl = `${getAppBaseUrl()}/`;
+                  if (window.location.pathname !== homeUrl) {
+                    window.history.pushState({}, '', homeUrl);
+                  }
+                }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }}
               onOpenBlog={handleOpenBlog}
@@ -1654,6 +1625,7 @@ function MainApp() {
               setBlogPosts(Array.from(map.values()));
             }}
             hideDemoBlogs={hideDemoBlogs}
+            blogViews={blogViews}
           />
         </Suspense>
       )}
@@ -1675,6 +1647,7 @@ function MainApp() {
           <BlogModal
             post={selectedBlogPost}
             onClose={() => setSelectedBlogPost(null)}
+            blogViews={blogViews}
             onExploreEbooks={() => {
               setSelectedBlogPost(null);
               setCurrentView('home');
@@ -1708,6 +1681,20 @@ function MainApp() {
             }}
           />
         </Suspense>
+      )}
+
+      {/* In-App Feedback Toast for App Download */}
+      {appDownloadMessage && (
+        <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-50 bg-slate-900/95 backdrop-blur-md text-white text-xs sm:text-sm font-bold px-5 py-3.5 rounded-2xl shadow-2xl border border-slate-700 flex items-center gap-3 animate-fadeIn max-w-sm text-center">
+          <span>{appDownloadMessage}</span>
+          <button
+            onClick={() => setAppDownloadMessage(null)}
+            className="text-slate-400 hover:text-white font-bold ml-2 text-sm cursor-pointer p-1"
+            aria-label="বার্তা বন্ধ করুন"
+          >
+            ✕
+          </button>
+        </div>
       )}
     </div>
   );

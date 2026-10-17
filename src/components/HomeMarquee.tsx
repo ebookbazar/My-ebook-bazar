@@ -1,0 +1,114 @@
+import React from 'react';
+import { Megaphone, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { MarqueeSettings } from '../types';
+
+interface HomeMarqueeProps {
+  settings: MarqueeSettings;
+  isAdmin?: boolean;
+  onOpenAdminSettings?: () => void;
+}
+
+export const HomeMarquee: React.FC<HomeMarqueeProps> = React.memo(({
+  settings,
+  isAdmin,
+  onOpenAdminSettings
+}) => {
+  if (settings.enabled === false) {
+    return null;
+  }
+
+  // Calculate speed duration (seconds)
+  let duration = '28s';
+  if (typeof (settings as any).speedDuration === 'number' && (settings as any).speedDuration > 0) {
+    duration = `${(settings as any).speedDuration}s`;
+  } else if (settings.speed === 'slow') {
+    duration = '45s';
+  } else if (settings.speed === 'fast') {
+    duration = '18s';
+  }
+
+  const text = settings.text || 'নতুন eBook প্রকাশিত হয়েছে! এখনই দেখে নিন এবং আপনার জ্ঞানের ভাণ্ডার সমৃদ্ধ করুন।';
+  const bgColor = settings.bgColor || '#f0fdf4';
+  const textColor = settings.textColor || '#064e3b';
+
+  return (
+    <div 
+      className="relative overflow-hidden rounded-2xl shadow-xs border border-emerald-200/90 select-none group transition-all"
+      style={{ backgroundColor: bgColor, color: textColor }}
+      role="region"
+      aria-label="ঘোষণা মারকুই"
+    >
+      <div className="flex items-center h-11 sm:h-12 px-3.5 sm:px-4 gap-2 sm:gap-3">
+        {/* Left Megaphone Announcement Icon */}
+        <div className="shrink-0 flex items-center gap-1.5 text-emerald-800">
+          <Megaphone className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700 animate-pulse" />
+        </div>
+
+        {/* Scrolling text container */}
+        <div className="flex-1 overflow-hidden relative">
+          <div 
+            className="whitespace-nowrap flex items-center will-change-transform group-hover:[animation-play-state:paused]"
+            style={{
+              animation: `marqueeScroll ${duration} linear infinite`
+            }}
+          >
+            <span className="font-bold text-xs sm:text-sm md:text-base tracking-wide inline-block pr-16">
+              {text}
+            </span>
+            <span className="font-bold text-xs sm:text-sm md:text-base tracking-wide inline-block pr-16" aria-hidden="true">
+              {text}
+            </span>
+            <span className="font-bold text-xs sm:text-sm md:text-base tracking-wide inline-block pr-16" aria-hidden="true">
+              {text}
+            </span>
+          </div>
+        </div>
+
+        {/* Right Arrow Controls matching reference design */}
+        <div className="shrink-0 flex items-center gap-1 text-emerald-700">
+          <button 
+            type="button"
+            className="p-1 rounded-lg hover:bg-black/5 text-emerald-800 transition"
+            aria-label="পূর্ববর্তী ঘোষণা"
+            title="পূর্ববর্তী ঘোষণা"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button 
+            type="button"
+            className="p-1 rounded-lg hover:bg-black/5 text-emerald-800 transition"
+            aria-label="পরবর্তী ঘোষণা"
+            title="পরবর্তী ঘোষণা"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+
+          {/* Admin Quick Settings trigger if logged in as Admin */}
+          {isAdmin && onOpenAdminSettings && (
+            <button
+              onClick={onOpenAdminSettings}
+              type="button"
+              className="ml-1 p-1.5 rounded-lg bg-emerald-800 text-white hover:bg-emerald-900 transition cursor-pointer"
+              title="মারকুই নোটিশ এডিট করুন (Admin)"
+              aria-label="মারকুই নোটিশ এডিট করুন"
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Embedded inline keyframes for marqueeScroll */}
+      <style>{`
+        @keyframes marqueeScroll {
+          0% {
+            transform: translateX(0%);
+          }
+          100% {
+            transform: translateX(-33.333%);
+          }
+        }
+      `}</style>
+    </div>
+  );
+});

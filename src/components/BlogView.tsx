@@ -23,7 +23,7 @@ import {
 } from 'lucide-react';
 import { BlogPost, Ebook } from '../types';
 import { updateDocumentSeo, resetDocumentSeo, getPublicBlogUrl, copyToClipboard } from '../utils/blogSeo';
-import { formatBlogContentToHtml, formatBlogViewCount } from '../utils/blogFormatter';
+import { formatBlogContentToHtml, formatBlogViewCount, getEffectiveBlogViews } from '../utils/blogFormatter';
 import { recordBlogArticleView } from '../services/blogService';
 import { recordBlogTrafficEvent, startVisitorHeartbeat } from '../services/blogAnalyticsService';
 
@@ -39,6 +39,9 @@ interface BlogViewProps {
   onOpenAdminBlogManager?: () => void;
   notFoundSlug?: string | null;
   onClearNotFound?: () => void;
+  blogViews?: Record<string, number>;
+  isLoading?: boolean;
+  error?: string | null;
 }
 
 export const BlogView: React.FC<BlogViewProps> = ({
@@ -52,18 +55,24 @@ export const BlogView: React.FC<BlogViewProps> = ({
   onDeleteDemo,
   onOpenAdminBlogManager,
   notFoundSlug,
-  onClearNotFound
+  onClearNotFound,
+  blogViews,
+  isLoading = false,
+  error = null
 }) => {
   const [selectedCategory, setSelectedCategory] = useState<string>('সব');
   const [copiedLink, setCopiedLink] = useState<boolean>(false);
   const [expandedCardId, setExpandedCardId] = useState<string | null>(null);
 
-  // Accurate & persistent public article view count recording (Session deduplicated)
+  // Accurate & persistent public article view count recording (Session deduplicated, no admin preview count)
   useEffect(() => {
     if (!activePost || activePost.isDemo) return;
-    recordBlogArticleView(activePost.id);
+    recordBlogArticleView(activePost.id, {
+      isDraft: activePost.status === 'DRAFT',
+      isAdmin: isAdmin
+    });
     recordBlogTrafficEvent(activePost.id, activePost.title);
-  }, [activePost?.id]);
+  }, [activePost?.id, isAdmin]);
 
   // Real-time Active Visitor Presence Heartbeat (5-min rolling window)
   useEffect(() => {
@@ -423,10 +432,12 @@ export const BlogView: React.FC<BlogViewProps> = ({
           <div className="flex flex-wrap items-center gap-4 sm:gap-6 text-xs sm:text-sm text-slate-600 font-semibold border-y border-slate-100 py-3.5">
             <span className="flex items-center gap-2">
               <div className="w-8 h-8 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center font-black text-xs">
-                {activePost.author.charAt(0)}
+                {typeof activePost.author === 'string' && activePost.author.trim().length > 0
+                  ? activePost.author.trim().charAt(0)
+                  : 'E'}
               </div>
               <div>
-                <span className="text-slate-900 font-bold block">{activePost.author}</span>
+                <span className="text-slate-900 font-bold block">{activePost.author || 'eBookBazar Editor'}</span>
                 {activePost.authorRole && (
                   <span className="text-[11px] text-slate-400 block -mt-0.5">{activePost.authorRole}</span>
                 )}
@@ -445,9 +456,9 @@ export const BlogView: React.FC<BlogViewProps> = ({
               </span>
             )}
 
-            <span className="flex items-center gap-1.5 text-emerald-800" title="মোট পাঠ বা ভিউ সংখ্যা">
+            <span className="flex items-center gap-1.5 text-emerald-800 font-bold" title="মোট পাঠ বা ভিউ সংখ্যা">
               <Eye className="w-4 h-4 text-emerald-700" />
-              <span>{formatBlogViewCount(activePost.views ?? activePost.viewCount ?? 0)}</span>
+              <span>{formatBlogViewCount(getEffectiveBlogViews(activePost, blogViews))}</span>
             </span>
           </div>
 
@@ -738,8 +749,32 @@ export const BlogView: React.FC<BlogViewProps> = ({
         </div>
       </div>
 
-      {/* Blog Posts Grid - Preserving Existing Blog Card Design */}
-      {filteredPosts.length === 0 ? (
+      {/* Blog Posts Grid - Loading, Error, Empty & Content States */}
+      {isLoading && posts.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-4">
+          <div className="w-10 h-10 border-4 border-emerald-600 border-t-transparent rounded-full animate-spin mx-auto"></div>
+          <h3 className="text-lg font-bold text-slate-800">ব্লগ পোস্ট লোড হচ্ছে...</h3>
+          <p className="text-sm text-slate-500 max-w-md mx-auto">
+            শেয়ার্ড ডাটাবেস থেকে সর্বশেষ প্রকাশিত পোস্টগুলো সিঙ্ক করা হচ্ছে। অনুগ্রহ করে একটু অপেক্ষা করুন।
+          </p>
+        </div>
+      ) : error && posts.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center border border-red-200 space-y-4">
+          <div className="w-12 h-12 bg-red-50 text-red-600 rounded-2xl flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900">ব্লগ লোড করতে সমস্যা হয়েছে</h3>
+          <p className="text-sm text-red-600 max-w-md mx-auto">
+            {error}
+          </p>
+          <button
+            onClick={() => window.location.reload()}
+            className="mt-2 bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-bold px-5 py-2.5 rounded-xl transition shadow-xs"
+          >
+            পুনরায় চেষ্টা করুন
+          </button>
+        </div>
+      ) : filteredPosts.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-slate-200 space-y-4">
           <BookOpen className="w-12 h-12 text-emerald-600 mx-auto" />
           <h3 className="text-xl font-bold text-slate-800">কোনো ব্লগ পোস্ট পাওয়া যায়নি</h3>
@@ -757,6 +792,7 @@ export const BlogView: React.FC<BlogViewProps> = ({
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredPosts.map((post) => {
             const isExpanded = expandedCardId === post.id;
+            const currentViews = getEffectiveBlogViews(post, blogViews);
             return (
               <div
                 key={post.id}
@@ -800,9 +836,9 @@ export const BlogView: React.FC<BlogViewProps> = ({
                           <span>{post.readTime}</span>
                         </span>
                       )}
-                      <span className="flex items-center gap-1.5 text-slate-600" title="মোট ভিউ সংখ্যা">
+                      <span className="flex items-center gap-1.5 text-slate-600 font-bold" title="মোট ভিউ সংখ্যা">
                         <Eye className="w-4 h-4 text-emerald-600" />
-                        <span>{formatBlogViewCount(post.views ?? post.viewCount ?? 0)}</span>
+                        <span>{formatBlogViewCount(currentViews)}</span>
                       </span>
                     </div>
 

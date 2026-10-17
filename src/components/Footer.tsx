@@ -85,8 +85,8 @@ export const Footer: React.FC<FooterProps> = ({
         <div className="absolute -top-24 -left-24 w-80 h-80 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
         <div className="absolute -bottom-24 -right-24 w-80 h-80 bg-cyan-500/10 rounded-full blur-3xl pointer-events-none" />
 
-        {/* 4 COLUMNS GRID */}
-        <div className="relative z-10 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-8 md:gap-10">
+        {/* 2 BALANCED COLUMNS GRID */}
+        <div className="relative z-10 grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-14">
           {/* ======================================================== */}
           {/* COLUMN 1: Official Logo, Brand, Description & Trust Badge */}
           {/* ======================================================== */}
@@ -157,159 +157,7 @@ export const Footer: React.FC<FooterProps> = ({
           </div>
 
           {/* ======================================================== */}
-          {/* COLUMN 2: দ্রুত লিংক (Quick Links)                       */}
-          {/* ======================================================== */}
-          <nav aria-label="দ্রুত লিংক" className="space-y-3">
-            <h3 className="font-black text-white text-base md:text-lg mb-4 uppercase tracking-wider border-b-2 border-emerald-500/60 pb-1.5 inline-block">
-              দ্রুত লিংক
-            </h3>
-            <ul className="space-y-2.5 text-xs sm:text-sm">
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => { setCurrentView('home'); scrollToTop(); }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <span className="text-amber-400 group-hover:scale-110 transition-transform" aria-hidden="true">★</span>
-                  <span>ই-বুক মার্কেটপ্লেস</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => { setCurrentView('blog'); scrollToTop(); }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform" aria-hidden="true">➜</span>
-                  <span>বই ও ব্লগ</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => { setCurrentView('tools'); scrollToTop(); }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform" aria-hidden="true">➜</span>
-                  <span>ফ্রি টুলস ও ক্যালকুলেটর</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => { setCurrentView('affiliate'); scrollToTop(); }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform" aria-hidden="true">➜</span>
-                  <span>অ্যাফিলিয়েট প্রোগ্রাম</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => { setCurrentView('membership'); scrollToTop(); }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform" aria-hidden="true">➜</span>
-                  <span>সেলার মেম্বারশিপ</span>
-                </button>
-              </li>
-              {userProfile?.role === 'seller' && (
-                <li>
-                  <button 
-                    type="button"
-                    onClick={() => { setCurrentView('seller-dashboard'); scrollToTop(); }}
-                    className="text-amber-300 hover:text-white transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                  >
-                    <span className="text-amber-400 group-hover:scale-110 transition-transform" aria-hidden="true">★</span>
-                    <span>সেলার প্যানেল</span>
-                  </button>
-                </li>
-              )}
-              {currentUser && userProfile?.role !== 'seller' && !isAdmin && (
-                <li>
-                  <button 
-                    type="button"
-                    onClick={() => { setCurrentView('user-dashboard'); scrollToTop(); }}
-                    className="text-emerald-200 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                  >
-                    <span className="text-emerald-400 group-hover:translate-x-0.5 transition-transform" aria-hidden="true">➜</span>
-                    <span>ইউজার ড্যাশবোর্ড</span>
-                  </button>
-                </li>
-              )}
-            </ul>
-          </nav>
-
-          {/* ======================================================== */}
-          {/* COLUMN 3: তথ্য ও নীতিমালা (Information & Policy)          */}
-          {/* ======================================================== */}
-          <nav aria-label="তথ্য ও নীতিমালা" className="space-y-3">
-            <h3 className="font-black text-white text-base md:text-lg mb-4 uppercase tracking-wider border-b-2 border-emerald-500/60 pb-1.5 inline-block">
-              তথ্য ও নীতিমালা
-            </h3>
-            <ul className="space-y-2.5 text-xs sm:text-sm">
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => handleLinkClick(footerLinks.aboutUrl, 'about')}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <Info className="w-4 h-4 text-emerald-300 group-hover:text-amber-300 shrink-0" aria-hidden="true" />
-                  <span>আমাদের সম্পর্কে (About Us)</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => handleLinkClick(footerLinks.contactUrl, 'contact')}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <Phone className="w-4 h-4 text-emerald-300 group-hover:text-amber-300 shrink-0" aria-hidden="true" />
-                  <span>যোগাযোগ (Contact Us)</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => { setCurrentView('faq'); scrollToTop(); }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <HelpCircle className="w-4 h-4 text-emerald-300 group-hover:text-amber-300 shrink-0" aria-hidden="true" />
-                  <span>সাধারণ প্রশ্ন ও উত্তর (FAQ)</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    if (onOpenTerms) onOpenTerms();
-                    else handleLinkClick(footerLinks.termsUrl, 'terms');
-                  }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <FileText className="w-4 h-4 text-emerald-300 group-hover:text-amber-300 shrink-0" aria-hidden="true" />
-                  <span>শর্তাবলি ও নীতিমালা (Terms)</span>
-                </button>
-              </li>
-              <li>
-                <button 
-                  type="button"
-                  onClick={() => {
-                    if (onOpenPrivacy) onOpenPrivacy();
-                    else handleLinkClick(footerLinks.privacyUrl, 'privacy');
-                  }}
-                  className="text-emerald-100 hover:text-amber-300 transition flex items-center gap-2 py-0.5 font-bold text-left group focus:outline-none focus:ring-1 focus:ring-amber-400 rounded-sm cursor-pointer"
-                >
-                  <ShieldCheck className="w-4 h-4 text-emerald-300 group-hover:text-amber-300 shrink-0" aria-hidden="true" />
-                  <span>গোপনীয়তা নীতি (Privacy Policy)</span>
-                </button>
-              </li>
-            </ul>
-          </nav>
-
-          {/* ======================================================== */}
-          {/* COLUMN 4: সোশ্যাল মিডিয়া & আমাদের সাথে থাকুন             */}
+          {/* COLUMN 2: সোশ্যাল মিডিয়া & আমাদের সাথে থাকুন             */}
           {/* ======================================================== */}
           <div className="space-y-4">
             <h3 className="font-black text-white text-base md:text-lg mb-4 uppercase tracking-wider border-b-2 border-emerald-500/60 pb-1.5 inline-block">
@@ -491,18 +339,52 @@ export const Footer: React.FC<FooterProps> = ({
         </section>
 
         {/* ======================================================== */}
-        {/* PART 8: BOTTOM COPYRIGHT & SCROLL TO TOP BAR              */}
+        {/* PART 8: BOTTOM COPYRIGHT, POLICY LINKS & SCROLL TO TOP BAR */}
         {/* ======================================================== */}
-        <div className="relative z-10 border-t border-emerald-600/40 mt-6 pt-4 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs sm:text-[13px] text-emerald-200/90">
-          <p className="font-medium text-center sm:text-left">
-            © {currentYear} <span className="text-amber-400 font-bold">eBookBazar</span>. সর্বস্বত্ব সংরক্ষিত। | ডিজিটাল বইয়ের বিশ্বস্ত ঠিকানা
-          </p>
+        <div className="relative z-10 border-t border-emerald-600/40 mt-6 pt-4 flex flex-col md:flex-row items-center justify-between gap-4 text-xs sm:text-[13px] text-emerald-200/90">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-4 text-center sm:text-left">
+            <p className="font-medium">
+              © {currentYear} <span className="text-amber-400 font-bold">eBookBazar</span>. সর্বস্বত্ব সংরক্ষিত।
+            </p>
+            <div className="flex items-center gap-3 text-emerald-300 font-semibold text-xs">
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenTerms) onOpenTerms();
+                  else handleLinkClick(footerLinks.termsUrl, 'terms');
+                }}
+                className="hover:text-amber-300 transition underline underline-offset-2 cursor-pointer"
+              >
+                শর্তাবলী
+              </button>
+              <span>•</span>
+              <button
+                type="button"
+                onClick={() => {
+                  if (onOpenPrivacy) onOpenPrivacy();
+                  else handleLinkClick(footerLinks.privacyUrl, 'privacy');
+                }}
+                className="hover:text-amber-300 transition underline underline-offset-2 cursor-pointer"
+              >
+                গোপনীয়তা নীতি
+              </button>
+              <span>•</span>
+              <a
+                href={footerLinks.contactUrl && !footerLinks.contactUrl.includes('8801673860659') ? footerLinks.contactUrl : "https://wa.me/8801911633056"}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-amber-300 transition underline underline-offset-2 cursor-pointer"
+              >
+                যোগাযোগ
+              </a>
+            </div>
+          </div>
 
           {/* Accessible Scroll to Top Pill Button */}
           <button 
             type="button"
             onClick={scrollToTop} 
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 hover:text-white font-bold transition shadow-sm active:scale-95 group focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 hover:text-white font-bold transition shadow-sm active:scale-95 group focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shrink-0"
             title="উপরে স্ক্রোল করুন"
             aria-label="পৃষ্ঠার শুরুতে স্ক্রোল করুন"
           >

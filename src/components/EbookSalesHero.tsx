@@ -1,191 +1,115 @@
 import React from 'react';
-import { BookOpen, Sparkles, ArrowRight, ShieldCheck, Zap, Smartphone, CheckCircle, Star } from 'lucide-react';
-import { Ebook } from '../types';
-import { getOptimizedImageUrl } from '../utils/imageOptimizer';
+import { ArrowRight, UserCheck, Handshake, Sparkles, BookOpen } from 'lucide-react';
 
 interface EbookSalesHeroProps {
-  ebooks: Ebook[];
   onExploreEbooks: () => void;
-  onViewCurated: () => void;
-  onSelectBook: (book: Ebook) => void;
+  onSellEbook?: () => void;
+  onViewAffiliate?: () => void;
 }
 
 export const EbookSalesHero: React.FC<EbookSalesHeroProps> = React.memo(({
-  ebooks,
   onExploreEbooks,
-  onViewCurated,
-  onSelectBook
+  onSellEbook,
+  onViewAffiliate
 }) => {
-  // Select up to 3 actual published books for the hero preview
-  const showcaseBooks = (ebooks && ebooks.length > 0) ? ebooks.slice(0, 3) : [];
-
   return (
     <section 
-      aria-label="eBookBazar সেলস হিরো ব্যানার" 
-      className="relative bg-gradient-to-b from-white via-slate-50/60 to-emerald-50/20 rounded-3xl border border-slate-200/90 shadow-sm overflow-hidden p-5 sm:p-7 md:p-8 lg:p-9 transition-all"
+      aria-label="eBookBazar স্পেশাল হিরো ব্যানার" 
+      className="relative w-full rounded-[28px] sm:rounded-[36px] border-2 border-emerald-400/30 shadow-xl overflow-hidden bg-gradient-to-r from-[#dcf0fa] via-[#eaf7ee] to-[#dff3e5] transition-all"
     >
-      {/* Subtle bookstore ambient glow */}
-      <div className="absolute top-0 right-0 w-80 h-80 bg-emerald-100/40 rounded-full blur-3xl pointer-events-none -mr-16 -mt-16" />
-      <div className="absolute bottom-0 left-0 w-72 h-72 bg-amber-100/30 rounded-full blur-3xl pointer-events-none -ml-16 -mb-16" />
+      {/* Decorative Natural Ambient Lights */}
+      <div className="absolute top-0 left-1/4 w-96 h-96 bg-emerald-300/20 rounded-full blur-3xl pointer-events-none" />
+      <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-amber-200/20 rounded-full blur-3xl pointer-events-none" />
 
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8 lg:gap-10 items-center">
-        {/* LEFT COLUMN: Brand, H1, Description, CTAs, Trust Highlights (7 cols on lg) */}
-        <div className="lg:col-span-7 space-y-4 sm:space-y-4.5 text-left">
-          {/* Brand Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-emerald-50 border border-emerald-200/90 text-emerald-900 text-xs sm:text-sm font-bold tracking-tight shadow-2xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-600 animate-pulse" />
-            <span>eBookBazar — আপনার শেখার ডিজিটাল ঠিকানা</span>
+      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 items-center min-h-[380px] sm:min-h-[420px] md:min-h-[460px]">
+        {/* LEFT COLUMN: Texts, Headline, Badges, CTAs, and Links (7 cols on Desktop) */}
+        <div className="lg:col-span-7 p-6 sm:p-8 md:p-10 lg:p-12 space-y-4 sm:space-y-5 text-left z-20">
+          {/* Badge: 📚 EBOOKBAZAR SPECIAL */}
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-xl bg-amber-400 text-slate-950 text-xs sm:text-sm font-black shadow-sm tracking-wide border border-amber-500/40">
+            <BookOpen className="w-4 h-4 fill-slate-950 text-slate-950" />
+            <span>EBOOKBAZAR SPECIAL</span>
           </div>
 
-          {/* Main H1 Heading */}
-          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-4xl xl:text-5xl font-black text-slate-900 tracking-tight leading-[1.25] sm:leading-[1.2]">
-            শিখুন নতুন কিছু,{' '}
-            <span className="text-[#15803d]">নিজের দক্ষতা বাড়ান</span>
-          </h1>
+          {/* Main Headline: পড়ুন, শিখুন, এগিয়ে যান! */}
+          <div className="relative">
+            <h1 className="text-3xl sm:text-4xl md:text-5xl lg:text-[52px] font-black text-[#0d4529] tracking-tight leading-[1.2] drop-shadow-2xs">
+              <span className="block text-[#0b5430] flex items-center gap-2 flex-wrap">
+                পড়ুন, শিখুন,
+                <span className="inline-flex items-center text-emerald-600 text-2xl sm:text-3xl animate-bounce" title="Learn & Grow">
+                  🍃
+                </span>
+              </span>
+              <span className="block text-amber-500 flex items-center gap-2 flex-wrap mt-0.5">
+                এগিয়ে যান!
+                <span className="text-xs sm:text-sm font-bold text-emerald-800 bg-emerald-100/80 px-2.5 py-0.5 rounded-full border border-emerald-300/70 uppercase tracking-widest">
+                  Earn, Learn, Grow!
+                </span>
+              </span>
+            </h1>
+          </div>
 
-          {/* Description */}
-          <p className="text-sm sm:text-base md:text-lg text-slate-600 font-medium leading-relaxed max-w-2xl">
-            সহজ বাংলায় লেখা ব্যবহারিক eBook পড়ুন। অনলাইন ব্যবসা, প্রযুক্তি, ব্যক্তিগত অর্থব্যবস্থা
-            এবং বাংলা গল্পের বই থেকে নিজের প্রয়োজনের বইটি বেছে নিন।
+          {/* Supporting Text */}
+          <p className="text-sm sm:text-base md:text-lg text-slate-700 font-medium leading-relaxed max-w-xl">
+            আপনার পছন্দের বাংলা eBook কিনুন, নতুন দক্ষতা শিখুন এবং নিজের জ্ঞানকে আরও সমৃদ্ধ করুন।
           </p>
 
-          {/* CTA Buttons */}
-          <div className="flex flex-wrap items-center gap-3 pt-1">
-            {/* Primary Button */}
+          {/* Primary CTA Button: eBook দেখুন → */}
+          <div className="pt-2 flex flex-wrap items-center gap-4">
             <button
               type="button"
               onClick={onExploreEbooks}
-              className="bg-[#15803d] hover:bg-emerald-800 text-white font-black text-sm sm:text-base py-3 sm:py-3.5 px-6 rounded-2xl shadow-md shadow-emerald-900/20 hover:shadow-lg transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer"
+              className="bg-[#054b29] hover:bg-[#03341c] text-white font-black text-sm sm:text-base py-3 sm:py-3.5 px-7 sm:px-8 rounded-full shadow-lg shadow-emerald-950/20 hover:shadow-xl transition-all duration-200 flex items-center justify-center gap-2.5 active:scale-95 cursor-pointer group"
             >
-              <BookOpen className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-100" />
               <span>eBook দেখুন</span>
-              <ArrowRight className="w-4 h-4" />
-            </button>
-
-            {/* Secondary Button */}
-            <button
-              type="button"
-              onClick={onViewCurated}
-              className="bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm sm:text-base py-3 sm:py-3.5 px-6 rounded-2xl border-2 border-slate-200/90 hover:border-slate-300 transition flex items-center justify-center gap-2 active:scale-95 cursor-pointer shadow-2xs"
-            >
-              <Sparkles className="w-4 h-4 text-amber-500 fill-amber-500" />
-              <span>জনপ্রিয় বইগুলো দেখুন</span>
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
             </button>
           </div>
 
-          {/* Amazon-Inspired Trust Highlights Row */}
-          <div className="pt-3 border-t border-slate-200/70 grid grid-cols-2 sm:grid-cols-3 gap-2.5 sm:gap-3 text-xs sm:text-sm text-slate-700 font-semibold">
-            <div className="flex items-center gap-2 bg-white/70 backdrop-blur-2xs p-2 rounded-xl border border-slate-200/60">
-              <div className="w-6 h-6 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center shrink-0">
-                <Zap className="w-3.5 h-3.5" />
+          {/* Secondary Promotional Links (Seller & Affiliate) */}
+          <div className="pt-2 border-t border-emerald-700/15 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm font-bold text-slate-800">
+            {/* Link 1: নিজের eBook প্রকাশ করুন */}
+            <button
+              type="button"
+              onClick={onSellEbook}
+              className="flex items-center gap-2 hover:text-[#0b5430] transition text-left cursor-pointer group"
+            >
+              <div className="w-7 h-7 rounded-full bg-emerald-700 text-white flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                <UserCheck className="w-4 h-4" />
               </div>
-              <span className="truncate">তাৎক্ষণিক PDF এক্সেস</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/70 backdrop-blur-2xs p-2 rounded-xl border border-slate-200/60">
-              <div className="w-6 h-6 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
-                <ShieldCheck className="w-3.5 h-3.5" />
+              <span className="group-hover:underline">নিজের eBook প্রকাশ করুন</span>
+            </button>
+
+            {/* Link 2: অথবা Affiliate Program সম্পর্কে জানুন */}
+            <button
+              type="button"
+              onClick={onViewAffiliate}
+              className="flex items-center gap-2 hover:text-[#0b5430] transition text-left cursor-pointer group"
+            >
+              <div className="w-7 h-7 rounded-full bg-amber-500 text-slate-950 flex items-center justify-center shadow-xs group-hover:scale-105 transition-transform">
+                <Handshake className="w-4 h-4" />
               </div>
-              <span className="truncate">১০০% নিরাপদ পেমেন্ট</span>
-            </div>
-            <div className="flex items-center gap-2 bg-white/70 backdrop-blur-2xs p-2 rounded-xl border border-slate-200/60 col-span-2 sm:col-span-1">
-              <div className="w-6 h-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
-                <Smartphone className="w-3.5 h-3.5" />
-              </div>
-              <span className="truncate">মোবাইল ও কম্পিউটারে পাঠযোগ্য</span>
-            </div>
+              <span className="group-hover:underline">অথবা Affiliate Program সম্পর্কে জানুন।</span>
+            </button>
           </div>
         </div>
 
-        {/* RIGHT COLUMN: Amazon-Inspired Digital Bookstore Showcase (5 cols on lg) */}
-        <div className="lg:col-span-5 flex flex-col items-center justify-center w-full">
-          {showcaseBooks.length > 0 ? (
-            <div className="w-full max-w-lg bg-white/90 backdrop-blur-xs p-3.5 sm:p-4 rounded-3xl border border-slate-200/90 shadow-md">
-              {/* Bookstore Showcase Header */}
-              <div className="flex items-center justify-between pb-2.5 mb-2.5 border-b border-slate-100">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-2 h-2 rounded-full bg-emerald-600" />
-                  <span className="text-[11px] sm:text-xs font-black text-slate-800 uppercase tracking-wider">
-                    জনপ্রিয় ডিজিটাল বইসমূহ
-                  </span>
-                </div>
-                <span className="text-[10px] sm:text-[11px] text-emerald-800 font-bold bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200/70">
-                  ক্লিক করে বিস্তারিত দেখুন
-                </span>
-              </div>
+        {/* RIGHT COLUMN: Character with glasses reading under the tree (5 cols on Desktop) */}
+        <div className="lg:col-span-5 relative w-full h-full min-h-[280px] sm:min-h-[340px] lg:min-h-[460px] flex items-end justify-center lg:justify-end overflow-hidden">
+          {/* Flipped horizontally to match the user's reference mockup with boy on the right facing left */}
+          <picture className="w-full h-full flex items-end justify-center lg:justify-end">
+            <img 
+              src={`${(import.meta.env.BASE_URL || '/').replace(/\/$/, '') || ''}/hero-banner-boy.jpg`} 
+              alt="eBookBazar চরিত্র বই পড়ছে"
+              width={800}
+              height={500}
+              loading="eager"
+              decoding="async"
+              className="w-full h-full object-cover object-center lg:object-right transition-transform duration-500 transform -scale-x-100 max-h-[460px]"
+            />
+          </picture>
 
-              {/* 3 Real Book Covers - Bookstore Pedestal Showcase */}
-              <div className="grid grid-cols-3 gap-2.5 sm:gap-3.5">
-                {showcaseBooks.map((book, idx) => {
-                  const salePrice = book.discountPrice 
-                    ? Math.min(book.discountPrice, book.price) 
-                    : (book.regularPrice && book.regularPrice > book.price ? book.price : book.price);
-                  const isFeaturedCenter = idx === 1;
-
-                  return (
-                    <div
-                      key={book.id}
-                      onClick={() => onSelectBook(book)}
-                      className={`group cursor-pointer bg-white rounded-2xl border border-slate-200/90 p-2 sm:p-2.5 flex flex-col justify-between transition-all duration-300 hover:-translate-y-1.5 hover:shadow-xl hover:border-emerald-300 select-none ${
-                        isFeaturedCenter ? 'shadow-md ring-1 ring-emerald-500/30' : 'shadow-xs'
-                      }`}
-                      title={`${book.title} — বিস্তারিত বিবরণ দেখতে ক্লিক করুন`}
-                    >
-                      {/* Realistic 3D Book Cover with Spine & Sheen */}
-                      <div className="relative aspect-[3/4.2] rounded-xl overflow-hidden bg-slate-900 shadow-sm group-hover:shadow-md transition-shadow mb-2">
-                        {/* Book Spine Highlight Effect */}
-                        <div className="absolute inset-y-0 left-0 w-2.5 bg-gradient-to-r from-black/40 via-white/20 to-transparent pointer-events-none z-10" />
-                        
-                        {/* Soft Cover Sheen */}
-                        <div className="absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/10 pointer-events-none z-10" />
-
-                        {/* Real Cover Image */}
-                        <img
-                          src={getOptimizedImageUrl(book.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f', { width: 240, height: 336, quality: 75 })}
-                          alt={book.title}
-                          width={140}
-                          height={196}
-                          decoding="async"
-                          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                          loading="eager"
-                        />
-
-                        {/* Category Chip on Cover */}
-                        <span className="absolute top-1.5 left-1.5 z-20 bg-slate-950/80 backdrop-blur-2xs text-white text-[9px] font-bold px-1.5 py-0.5 rounded shadow-xs max-w-[85%] truncate">
-                          {book.category || 'eBook'}
-                        </span>
-
-                        {/* Price Tag on Cover */}
-                        <span className="absolute bottom-1.5 right-1.5 z-20 bg-emerald-800 text-white text-[10px] sm:text-[11px] font-black px-1.5 py-0.5 rounded shadow-sm border border-emerald-600">
-                          ৳{salePrice}
-                        </span>
-                      </div>
-
-                      {/* Book Meta Details */}
-                      <div className="space-y-0.5">
-                        <h4 className="text-[11px] sm:text-xs font-black text-slate-900 line-clamp-2 leading-snug group-hover:text-emerald-700 transition">
-                          {book.title}
-                        </h4>
-                        <p className="text-[10px] text-slate-500 truncate font-medium">
-                          {book.author || 'লেখক'}
-                        </p>
-                      </div>
-
-                      {/* Quick Action Prompt */}
-                      <div className="pt-1.5 mt-1 border-t border-slate-100 flex items-center justify-between text-[10px] text-emerald-800 font-bold">
-                        <span>বিস্তারিত</span>
-                        <span className="group-hover:translate-x-0.5 transition-transform">→</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          ) : (
-            <div className="w-full max-w-sm bg-white rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500 text-xs">
-              <BookOpen className="w-8 h-8 text-slate-400 mx-auto mb-2" />
-              <span>ডিজিটাল বইয়ের সমাহার</span>
-            </div>
-          )}
+          {/* Soft gradient blend on the left edge of the image on desktop */}
+          <div className="hidden lg:block absolute inset-y-0 left-0 w-24 bg-gradient-to-r from-[#eaf7ee] to-transparent pointer-events-none" />
         </div>
       </div>
     </section>

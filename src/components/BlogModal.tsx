@@ -1,7 +1,7 @@
 import React, { useEffect } from 'react';
 import { X, Calendar, Clock, User, Share2, BookOpen, ArrowRight, Eye } from 'lucide-react';
 import { BlogPost } from '../types';
-import { formatBlogContentToHtml, formatBlogViewCount } from '../utils/blogFormatter';
+import { formatBlogContentToHtml, formatBlogViewCount, getEffectiveBlogViews } from '../utils/blogFormatter';
 import { recordBlogArticleView } from '../services/blogService';
 import { recordBlogTrafficEvent, startVisitorHeartbeat } from '../services/blogAnalyticsService';
 
@@ -9,14 +9,17 @@ interface BlogModalProps {
   post: BlogPost | null;
   onClose: () => void;
   onExploreEbooks: () => void;
+  blogViews?: Record<string, number>;
 }
 
-export const BlogModal: React.FC<BlogModalProps> = ({ post, onClose, onExploreEbooks }) => {
+export const BlogModal: React.FC<BlogModalProps> = ({ post, onClose, onExploreEbooks, blogViews }) => {
   if (!post) return null;
 
   useEffect(() => {
     if (!post || post.isDemo) return;
-    recordBlogArticleView(post.id);
+    recordBlogArticleView(post.id, {
+      isDraft: post.status === 'DRAFT'
+    });
     recordBlogTrafficEvent(post.id, post.title);
     const cleanup = startVisitorHeartbeat({
       postId: post.id,
@@ -76,7 +79,10 @@ export const BlogModal: React.FC<BlogModalProps> = ({ post, onClose, onExploreEb
             <div className="flex flex-wrap items-center gap-4 text-xs sm:text-sm text-slate-600 font-semibold">
               <span className="flex items-center gap-1.5">
                 <User className="w-4 h-4 text-emerald-700" />
-                <span>{post.author} ({post.authorRole})</span>
+                <span>
+                  {post.author || 'eBookBazar Editor'}
+                  {post.authorRole ? ` (${post.authorRole})` : ''}
+                </span>
               </span>
               <span className="flex items-center gap-1.5">
                 <Calendar className="w-4 h-4 text-emerald-700" />
@@ -88,7 +94,7 @@ export const BlogModal: React.FC<BlogModalProps> = ({ post, onClose, onExploreEb
               </span>
               <span className="flex items-center gap-1.5 text-emerald-800 font-bold" title="মোট পাঠ বা ভিউ সংখ্যা">
                 <Eye className="w-4 h-4 text-emerald-700" />
-                <span>{formatBlogViewCount(post.views ?? post.viewCount ?? 0)}</span>
+                <span>{formatBlogViewCount(getEffectiveBlogViews(post, blogViews))}</span>
               </span>
             </div>
           </div>

@@ -84,7 +84,9 @@ import {
   AppDownloadStats,
   EbookRating,
   EbookRatingSummary,
-  BlogPost
+  BlogPost,
+  MarqueeSettings,
+  DEFAULT_MARQUEE_SETTINGS
 } from '../types';
 import { useAuth } from '../context/AuthContext';
 import { calculateAppDownloadMetrics, resetAppDownloadStats, formatAndValidateDownloadUrl } from '../services/appDownloadService';
@@ -262,6 +264,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
   const [savingAppDownload, setSavingAppDownload] = useState(false);
   const [appDownloadSettings, setAppDownloadSettings] = useState<AppDownloadSettings>(DEFAULT_APP_DOWNLOAD_SETTINGS);
   const [appDownloadStats, setAppDownloadStats] = useState<AppDownloadStats>({ totalClicks: 0 });
+
+  // Home Page Marquee Settings State
+  const [marqueeSettings, setMarqueeSettings] = useState<MarqueeSettings>(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const raw = localStorage.getItem('ebookbazar_marquee_settings');
+        if (raw) return JSON.parse(raw);
+      } catch {}
+    }
+    return DEFAULT_MARQUEE_SETTINGS;
+  });
+  const [savingMarquee, setSavingMarquee] = useState(false);
 
   // Realtime Data Collections
   const [users, setUsers] = useState<Record<string, UserProfile>>({});
@@ -621,6 +635,26 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         }
       }, () => {});
 
+      const handleMarqueeSnap = (snap: any) => {
+        if (active && snap.exists()) {
+          const val = snap.val();
+          if (val && typeof val === 'object') {
+            setMarqueeSettings(prev => ({
+              ...prev,
+              ...val,
+              enabled: val.enabled !== false,
+              text: val.text || prev.text,
+              bgColor: val.bgColor || prev.bgColor,
+              textColor: val.textColor || prev.textColor,
+              speed: val.speed || prev.speed
+            }));
+          }
+        }
+      };
+
+      const unsubMarquee0 = onValue(ref(db, 'ebooks/_marquee'), handleMarqueeSnap, () => {});
+      const unsubMarquee1 = onValue(ref(db, 'settings/marquee'), handleMarqueeSnap, () => {});
+
       return () => {
         unsubOrders();
         unsubWithReqs();
@@ -639,6 +673,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
         unsubAppDownload0();
         unsubAppDownload2();
         unsubAppDownloadStats();
+        unsubMarquee0();
+        unsubMarquee1();
       };
     };
 
@@ -1856,6 +1892,91 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }
   };
 
+  // 5e. Marquee Announcement Save & Management
+  const handleSaveMarqueeSettings = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!currentUser || !isAdmin) {
+      showToast('error', 'শুধুমাত্র অনুমোদিত অ্যাডমিন Marquee সেটিংস পরিবর্তন করতে পারবেন।');
+      return;
+    }
+
+    const trimmedText = (marqueeSettings.text || '').trim();
+    if (!trimmedText) {
+      showToast('error', 'নোটিশ বার্তা ফাঁকা রাখা যাবে না। অনুগ্রহ করে টেক্সট লিখুন।');
+      return;
+    }
+
+    setSavingMarquee(true);
+    try {
+      const clampedDuration = Math.max(10, Math.min(60, Number(marqueeSettings.speedDuration) || (marqueeSettings.speed === 'slow' ? 45 : marqueeSettings.speed === 'fast' ? 18 : 28)));
+      const derivedSpeed: 'slow' | 'medium' | 'fast' = clampedDuration > 35 ? 'slow' : clampedDuration < 22 ? 'fast' : 'medium';
+
+      const existingNotices = marqueeSettings.notices && marqueeSettings.notices.length > 0 
+        ? marqueeSettings.notices 
+        : [{ id: 'notice-1', text: trimmedText, createdAt: Date.now() }];
+
+      const payload: MarqueeSettings = {
+        enabled: marqueeSettings.enabled !== false,
+        text: trimmedText,
+        bgColor: marqueeSettings.bgColor || '#f0fdf4',
+        textColor: marqueeSettings.textColor || '#064e3b',
+        speed: derivedSpeed,
+        speedDuration: clampedDuration,
+        notices: existingNotices,
+        updatedAt: Date.now()
+      };
+
+      await Promise.allSettled([
+        update(ref(db, 'ebooks/_marquee'), payload),
+        update(ref(db, 'settings/marquee'), payload)
+      ]);
+
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ebookbazar_marquee_settings', JSON.stringify(payload));
+      }
+
+      setMarqueeSettings(payload);
+      showToast('success', 'হোমপেজ Marquee স্ক্রোলিং নোটিশ সফলভাবে সংরক্ষিত হয়েছে!');
+    } catch (err: any) {
+      console.error('[Firebase Error] Failed to save Marquee:', err);
+      showToast('error', 'Marquee সেভ করতে ব্যর্থ হয়েছে: ' + (err?.message || err));
+    } finally {
+      setSavingMarquee(false);
+    }
+  };
+
+  const handleAddMarqueeNotice = () => {
+    const textPrompt = window.prompt('নতুন নোটিশ বার্তা লিখুন:');
+    if (!textPrompt || !textPrompt.trim()) return;
+
+    const newNotice = {
+      id: `notice-${Date.now()}`,
+      text: textPrompt.trim(),
+      createdAt: Date.now()
+    };
+
+    const updatedNotices = [...(marqueeSettings.notices || []), newNotice];
+    setMarqueeSettings(prev => ({
+      ...prev,
+      notices: updatedNotices,
+      text: newNotice.text
+    }));
+    showToast('success', 'নতুন নোটিশ তালিকায় যোগ হয়েছে। সেভ করতে সংরক্ষণ বাটনে ক্লিক করুন।');
+  };
+
+  const handleDeleteMarqueeNotice = (id: string) => {
+    if (!window.confirm('আপনি কি নিশ্চিত যে এই নোটিশটি ডিলিট করতে চান?')) return;
+
+    const updatedNotices = (marqueeSettings.notices || []).filter(n => n.id !== id);
+    const newText = updatedNotices.length > 0 ? updatedNotices[0].text : 'নতুন eBook প্রকাশিত হয়েছে! এখনই দেখে নিন।';
+
+    setMarqueeSettings(prev => ({
+      ...prev,
+      notices: updatedNotices,
+      text: newText
+    }));
+    showToast('success', 'নোটিশ ডিলিট করা হয়েছে। পরিবর্তন সেভ করতে সংরক্ষণ করুন।');
+  };
 
   // 6. Notification Management
   const handleCreateNotification = async (e: React.FormEvent) => {
@@ -3780,6 +3901,243 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
           {/* TAB 9: NOTIFICATIONS */}
           {activeTab === 'notifications' && (
             <div className="space-y-6">
+              {/* HOME PAGE MARQUEE CONTROLS */}
+              <div className="bg-white rounded-3xl p-6 border-2 border-emerald-500/30 shadow-md space-y-4">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-3">
+                  <div>
+                    <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full bg-emerald-50 text-emerald-800 text-[11px] font-black tracking-wide mb-1 border border-emerald-200">
+                      <span>নতুন কন্ট্রোল</span>
+                    </div>
+                    <h3 className="font-black text-slate-900 text-base flex items-center gap-2">
+                      <span>📢 হোমপেজ স্ক্রোলিং নোটিশ (Marquee Control)</span>
+                    </h3>
+                    <p className="text-xs text-slate-500">
+                      হোমপেজের ৬টি মূল ফিচার কার্ডের ঠিক উপরে প্রদর্শিত স্ক্রোলিং নোটিশের টেক্সট, ব্যাকগ্রাউন্ড কালার ও স্পিড কন্ট্রোল করুন
+                    </p>
+                  </div>
+                  <label className="flex items-center gap-2 cursor-pointer bg-slate-50 px-3 py-1.5 rounded-xl border border-slate-200 select-none">
+                    <input
+                      type="checkbox"
+                      checked={marqueeSettings.enabled !== false}
+                      onChange={(e) => setMarqueeSettings(prev => ({ ...prev, enabled: e.target.checked }))}
+                      className="w-4 h-4 text-emerald-600 rounded"
+                    />
+                    <span className="text-xs font-black text-slate-800">
+                      {marqueeSettings.enabled !== false ? 'সক্রিয় (Active)' : 'নিষ্ক্রিয় (Disabled)'}
+                    </span>
+                  </label>
+                </div>
+
+                {/* Saved Notices List & Management */}
+                <div className="space-y-2 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-700 uppercase tracking-wide">
+                      সংরক্ষিত নোটিশ তালিকা ({marqueeSettings.notices?.length || 1}টি)
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleAddMarqueeNotice}
+                      className="px-3 py-1 rounded-lg bg-emerald-100 hover:bg-emerald-200 text-emerald-900 font-bold text-xs transition cursor-pointer flex items-center gap-1"
+                    >
+                      <span>+ নতুন নোটিশ যোগ করুন</span>
+                    </button>
+                  </div>
+
+                  <div className="space-y-1.5 max-h-40 overflow-y-auto pr-1">
+                    {(marqueeSettings.notices || [
+                      { id: 'default-1', text: marqueeSettings.text || '📢 নতুন eBook প্রকাশিত হয়েছে! এখনই দেখে নিন।' }
+                    ]).map((n, idx) => (
+                      <div 
+                        key={n.id || idx}
+                        className={`p-2.5 rounded-xl border text-xs flex items-center justify-between gap-2 transition ${
+                          marqueeSettings.text === n.text ? 'bg-emerald-50 border-emerald-300 ring-1 ring-emerald-400' : 'bg-slate-50 border-slate-200'
+                        }`}
+                      >
+                        <span 
+                          onClick={() => setMarqueeSettings(prev => ({ ...prev, text: n.text }))}
+                          className="truncate flex-1 font-medium cursor-pointer text-slate-800 hover:text-emerald-700"
+                          title="এই নোটিশটি সক্রিয় করতে ক্লিক করুন"
+                        >
+                          {n.text}
+                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <button
+                            type="button"
+                            onClick={() => setMarqueeSettings(prev => ({ ...prev, text: n.text }))}
+                            className="px-2 py-0.5 rounded text-[10px] bg-slate-200 hover:bg-emerald-600 hover:text-white font-bold transition cursor-pointer"
+                          >
+                            নির্বাচন
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteMarqueeNotice(n.id)}
+                            className="px-2 py-0.5 rounded text-[10px] bg-rose-100 hover:bg-rose-600 hover:text-white text-rose-700 font-bold transition cursor-pointer"
+                          >
+                            ডিলিট
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Live Preview Box */}
+                <div className="space-y-1.5 pt-2 border-t border-slate-100">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">লাইভ প্রিভিউ (Live Preview):</span>
+                    <span className="text-[11px] text-emerald-700 font-bold">
+                      গতি: {marqueeSettings.speedDuration || (marqueeSettings.speed === 'slow' ? 45 : marqueeSettings.speed === 'fast' ? 18 : 28)} সেকেন্ড
+                    </span>
+                  </div>
+                  <div 
+                    className="p-3 rounded-xl border border-black/10 font-bold text-xs sm:text-sm overflow-hidden flex items-center justify-between"
+                    style={{ backgroundColor: marqueeSettings.bgColor || '#f0fdf4', color: marqueeSettings.textColor || '#064e3b' }}
+                  >
+                    <span className="truncate pr-2">{marqueeSettings.text || '📢 নতুন eBook প্রকাশিত হয়েছে! এখনই দেখে নিন এবং আপনার জ্ঞানের ভাণ্ডার সমৃদ্ধ করুন।'}</span>
+                    <span className="text-[10px] bg-black/15 px-2 py-0.5 rounded shrink-0">
+                      {marqueeSettings.speedDuration || 28}s
+                    </span>
+                  </div>
+                </div>
+
+                <form onSubmit={handleSaveMarqueeSettings} className="space-y-4 text-xs">
+                  <div>
+                    <label className="block font-bold text-slate-700 mb-1">নোটিশ বার্তা (Announcement Text) *</label>
+                    <textarea
+                      required
+                      rows={2}
+                      value={marqueeSettings.text}
+                      onChange={(e) => setMarqueeSettings(prev => ({ ...prev, text: e.target.value }))}
+                      className="w-full p-3 rounded-xl border border-slate-300 text-sm font-medium focus:ring-2 focus:ring-emerald-500 focus:outline-none"
+                      placeholder="📢 নতুন eBook প্রকাশিত হয়েছে..."
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    {/* Background Color Picker & Presets */}
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">ব্যাকগ্রাউন্ড কালার</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={marqueeSettings.bgColor || '#f0fdf4'}
+                          onChange={(e) => setMarqueeSettings(prev => ({ ...prev, bgColor: e.target.value }))}
+                          className="w-9 h-9 p-0.5 rounded-lg border border-slate-300 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={marqueeSettings.bgColor || '#f0fdf4'}
+                          onChange={(e) => setMarqueeSettings(prev => ({ ...prev, bgColor: e.target.value }))}
+                          className="w-full p-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                      <div className="flex gap-1.5 mt-1.5">
+                        {['#f0fdf4', '#ea580c', '#15803d', '#0f172a', '#fef3c7'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setMarqueeSettings(prev => ({ ...prev, bgColor: c }))}
+                            className="w-5 h-5 rounded-full border border-slate-300 shadow-2xs cursor-pointer"
+                            style={{ backgroundColor: c }}
+                            title={c}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Text Color Picker */}
+                    <div>
+                      <label className="block font-bold text-slate-700 mb-1">টেক্সট কালার</label>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="color"
+                          value={marqueeSettings.textColor || '#064e3b'}
+                          onChange={(e) => setMarqueeSettings(prev => ({ ...prev, textColor: e.target.value }))}
+                          className="w-9 h-9 p-0.5 rounded-lg border border-slate-300 cursor-pointer"
+                        />
+                        <input
+                          type="text"
+                          value={marqueeSettings.textColor || '#064e3b'}
+                          onChange={(e) => setMarqueeSettings(prev => ({ ...prev, textColor: e.target.value }))}
+                          className="w-full p-2 rounded-xl border border-slate-300 text-xs font-mono"
+                        />
+                      </div>
+                      <div className="flex gap-1.5 mt-1.5">
+                        {['#064e3b', '#ffffff', '#78350f', '#0f172a'].map((c) => (
+                          <button
+                            key={c}
+                            type="button"
+                            onClick={() => setMarqueeSettings(prev => ({ ...prev, textColor: c }))}
+                            className="w-5 h-5 rounded-full border border-slate-300 shadow-2xs cursor-pointer"
+                            style={{ backgroundColor: c }}
+                            title={c}
+                          />
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Scrolling Speed: Slider & Numeric Input (Marquee Speed) */}
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="block font-bold text-slate-700">Marquee Speed</label>
+                        <span className="text-[11px] font-mono font-bold text-emerald-800">
+                          {marqueeSettings.speedDuration || (marqueeSettings.speed === 'slow' ? 45 : marqueeSettings.speed === 'fast' ? 18 : 28)}s
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="range"
+                          min="10"
+                          max="60"
+                          step="1"
+                          value={marqueeSettings.speedDuration || (marqueeSettings.speed === 'slow' ? 45 : marqueeSettings.speed === 'fast' ? 18 : 28)}
+                          onChange={(e) => {
+                            const val = Math.max(10, Math.min(60, Number(e.target.value) || 28));
+                            setMarqueeSettings(prev => ({
+                              ...prev,
+                              speedDuration: val,
+                              speed: val > 35 ? 'slow' : val < 22 ? 'fast' : 'medium'
+                            }));
+                          }}
+                          className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-emerald-600"
+                        />
+                        <input
+                          type="number"
+                          min="10"
+                          max="60"
+                          value={marqueeSettings.speedDuration || (marqueeSettings.speed === 'slow' ? 45 : marqueeSettings.speed === 'fast' ? 18 : 28)}
+                          onChange={(e) => {
+                            const val = Math.max(10, Math.min(60, Number(e.target.value) || 28));
+                            setMarqueeSettings(prev => ({
+                              ...prev,
+                              speedDuration: val,
+                              speed: val > 35 ? 'slow' : val < 22 ? 'fast' : 'medium'
+                            }));
+                          }}
+                          className="w-16 p-1.5 rounded-lg border border-slate-300 text-xs font-mono font-bold text-center"
+                        />
+                      </div>
+                      <p className="text-[10px] text-slate-500 mt-1 leading-tight">
+                        কম সেকেন্ড (১০s) = দ্রুত স্ক্রোলিং; বেশি সেকেন্ড (৬০s) = ধীর স্ক্রোলিং।
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center justify-between pt-2 border-t border-slate-100">
+                    <span className="text-[11px] text-slate-500 font-medium">
+                      পরিবর্তন রিয়েল-টাইমে সেভ হবে
+                    </span>
+                    <button
+                      type="submit"
+                      disabled={savingMarquee}
+                      className="bg-[#15803d] hover:bg-emerald-800 disabled:opacity-50 text-white font-black px-6 py-2.5 rounded-xl shadow transition cursor-pointer flex items-center gap-2"
+                    >
+                      <span>{savingMarquee ? 'সংরক্ষণ হচ্ছে...' : 'Marquee সেটিংস সংরক্ষণ করুন'}</span>
+                    </button>
+                  </div>
+                </form>
+              </div>
+
               {/* Form */}
               <div className="bg-white rounded-3xl p-6 border border-slate-200 shadow-sm space-y-4">
                 <h3 className="font-black text-slate-900 text-base border-b border-slate-100 pb-2">
@@ -4712,7 +5070,7 @@ service cloud.firestore {
                                 <td className="p-4 align-top">
                                   <div className="flex items-center gap-1.5">
                                     <span className="font-mono font-bold text-slate-900 bg-slate-100 px-2 py-0.5 rounded text-[11px]">
-                                      #{t.id.slice(-8).toUpperCase()}
+                                      #{String(t.id || '').slice(-8).toUpperCase()}
                                     </span>
                                     {t.unreadByAdmin && (
                                       <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" title="নতুন টিকিট / অপঠিত" />
@@ -5844,7 +6202,7 @@ service cloud.firestore {
               <div className="space-y-1">
                 <div className="flex items-center gap-2">
                   <span className="font-mono font-black text-xs text-slate-500 bg-slate-100 px-2 py-0.5 rounded">
-                    #{selectedTicketForDetail.id.slice(-8).toUpperCase()}
+                    #{String(selectedTicketForDetail.id || '').slice(-8).toUpperCase()}
                   </span>
                   <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                     selectedTicketForDetail.userRole === 'seller'
@@ -6117,7 +6475,7 @@ service cloud.firestore {
               <div className="space-y-1">
                 <div className="flex items-center gap-2 flex-wrap">
                   <span className="font-mono font-black text-xs text-slate-600 bg-slate-100 px-2 py-0.5 rounded">
-                    #{viewingFullMessageTicket.id.slice(-8).toUpperCase()}
+                    #{String(viewingFullMessageTicket.id || '').slice(-8).toUpperCase()}
                   </span>
                   <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded ${
                     viewingFullMessageTicket.userRole === 'seller'
@@ -6343,7 +6701,7 @@ service cloud.firestore {
             <div className="p-3 bg-slate-50 rounded-2xl border border-slate-200 text-xs space-y-1.5">
               <div className="flex justify-between">
                 <span className="text-slate-500">টিকিট আইডি:</span>
-                <span className="font-mono font-bold text-slate-900">#{deletingTicket.id.slice(-8).toUpperCase()}</span>
+                <span className="font-mono font-bold text-slate-900">#{String(deletingTicket.id || '').slice(-8).toUpperCase()}</span>
               </div>
               <div className="flex justify-between">
                 <span className="text-slate-500">বিষয়:</span>

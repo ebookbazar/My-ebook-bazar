@@ -151,7 +151,24 @@ export const FreeToolsView: React.FC<FreeToolsViewProps> = ({
   };
 
   return (
-    <div className="space-y-8 animate-soft-fade-in pb-16">
+    <div className="space-y-6 sm:space-y-8 animate-soft-fade-in pb-16">
+      {/* Top Navigation Bar with Clear "← Home" Button */}
+      <div className="flex items-center justify-between gap-4 bg-white/95 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-sm">
+        <button
+          onClick={onNavigateHome}
+          className="flex items-center gap-2 text-emerald-800 hover:text-emerald-950 font-black text-xs sm:text-sm transition bg-emerald-50 hover:bg-emerald-100 px-4 py-2 rounded-xl border border-emerald-300 shadow-xs group cursor-pointer"
+          title="মূল হোম পেজে ফিরে যান"
+        >
+          <ArrowLeft className="w-4 h-4 text-emerald-700 group-hover:-translate-x-0.5 transition-transform" />
+          <span>← Home</span>
+        </button>
+
+        <div className="flex items-center gap-2 text-xs font-bold text-slate-500">
+          <Calculator className="w-4 h-4 text-emerald-700" />
+          <span>eBookBazar ফ্রি টুলস ও স্মার্ট ক্যালকুলেটর</span>
+        </div>
+      </div>
+
       {/* 1. HERO BANNER */}
       <div className="relative rounded-3xl bg-gradient-to-br from-emerald-900 via-emerald-800 to-teal-950 p-6 sm:p-10 text-white shadow-xl overflow-hidden border border-emerald-500/30">
         <div className="absolute -right-10 -bottom-10 w-64 h-64 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />

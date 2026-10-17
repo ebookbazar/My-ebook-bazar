@@ -85,9 +85,9 @@ export const Header: React.FC<HeaderProps> = ({
         Inspired directly by the reference image with deep emerald translucent glass,
         frosted blur, subtle specular highlights, official eBookBazar logo, and crisp buttons.
       */}
-      <div className="bg-[#052b16]/75 backdrop-blur-xl border-b border-emerald-500/35 shadow-[0_8px_32px_rgba(0,0,0,0.37)] transition-all">
-        {/* Subtle glass reflection sheen on top */}
-        <div className="absolute top-0 inset-x-8 h-[1px] bg-gradient-to-r from-transparent via-white/50 to-transparent pointer-events-none" />
+      <div className="bg-gradient-to-r from-[#032b18] via-[#053820] to-[#032b18] border-b border-amber-400/40 shadow-[0_4px_20px_rgba(0,0,0,0.35)] transition-all">
+        {/* Subtle golden reflection sheen on top */}
+        <div className="absolute top-0 inset-x-8 h-[1px] bg-gradient-to-r from-transparent via-amber-300/40 to-transparent pointer-events-none" />
 
         {/* Top Header Row */}
         <div className="container mx-auto px-4 py-2.5 sm:py-3 max-w-7xl flex items-center justify-between gap-3 sm:gap-4">
@@ -113,7 +113,6 @@ export const Header: React.FC<HeaderProps> = ({
                   className="w-full h-full rounded-full object-cover"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
-                    // Fallback in case image fails to load
                     const target = e.currentTarget;
                     target.style.display = 'none';
                     if (target.parentElement) {
@@ -129,98 +128,82 @@ export const Header: React.FC<HeaderProps> = ({
             <div className="flex flex-col">
               <div className="flex items-center gap-1.5">
                 <span className="text-xl sm:text-2xl md:text-[26px] font-black tracking-tight text-white drop-shadow-xs">
-                  eBook<span className="text-amber-400">Bazar</span>
-                </span>
-                <span className="bg-emerald-950/80 text-emerald-200 text-[8px] sm:text-[9px] font-black px-1.5 py-0.5 rounded-full border border-emerald-500/50 uppercase tracking-widest hidden md:inline-block">
-                  Marketplace
+                  eBook<span className="text-[#FACC15]">Bazar</span>
                 </span>
               </div>
-              <p className="text-[10px] text-emerald-200/90 font-medium hidden lg:block -mt-0.5">
-                ডিজিটাল বই, ব্লগ ও অ্যাফিলিয়েট প্ল্যাটফর্ম
+              <p className="text-[11px] sm:text-xs text-emerald-200/90 font-medium tracking-wide -mt-0.5">
+                পড়ুন • শিখুন • এগিয়ে যান
               </p>
             </div>
           </div>
 
-          {/* CENTER: Desktop Quick Navigation Links */}
-          <nav className="hidden xl:flex items-center gap-5 text-xs lg:text-sm font-bold text-emerald-100">
+          {/* CENTER: Desktop Quick Navigation Links Matching Reference (হোম, eBook, ব্লগ, সেলার, অ্যাফিলিয়েট, টুলস, অ্যাপ) */}
+          <nav className="hidden lg:flex items-center gap-4 xl:gap-6 text-xs lg:text-sm font-bold text-emerald-100">
             <button 
               onClick={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-amber-300 transition py-1 ${currentView === 'home' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer flex items-center gap-1.5 ${currentView === 'home' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
             >
-              মার্কেটপ্লেস
+              <Home className="w-3.5 h-3.5 text-[#FACC15]" />
+              <span>হোম</span>
             </button>
-            {userProfile?.role === 'seller' && (
-              <button 
-                onClick={() => { setCurrentView('seller-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-                className={`hover:text-amber-300 transition py-1 ${currentView === 'seller-dashboard' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
-              >
-                সেলার প্যানেল
-              </button>
-            )}
-            {currentUser && userProfile?.role !== 'seller' && !isAdmin && (
-              <button 
-                onClick={() => { setCurrentView('user-dashboard'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-                className={`hover:text-amber-300 transition py-1 ${currentView === 'user-dashboard' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
-              >
-                ইউজার ড্যাশবোর্ড
-              </button>
-            )}
+            <button 
+              onClick={() => { setCurrentView('ebooks'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'ebooks' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
+            >
+              eBook
+            </button>
             <button 
               onClick={() => { setCurrentView('blog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-amber-300 transition py-1 ${currentView === 'blog' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'blog' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
             >
-              বই ও ব্লগ
+              ব্লগ
+            </button>
+            <button 
+              onClick={() => {
+                if (userProfile?.role === 'seller') {
+                  setCurrentView('seller-dashboard');
+                } else {
+                  if (onOpenAuth) onOpenAuth('seller-register');
+                }
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }} 
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'seller-dashboard' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
+            >
+              সেলার
             </button>
             <button 
               onClick={() => { setCurrentView('affiliate'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-amber-300 transition py-1 ${currentView === 'affiliate' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'affiliate' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
             >
-              অ্যাফিলিয়েট
-            </button>
-            <button 
-              onClick={() => { setCurrentView('membership'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-amber-300 transition py-1 ${currentView === 'membership' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
-            >
-              মেম্বারশিপ
+              অ্যাফিলিয়েট
             </button>
             <button 
               onClick={() => { setCurrentView('tools'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-amber-300 transition flex items-center gap-1 py-1 ${currentView === 'tools' ? 'text-amber-300 border-b-2 border-amber-400 pb-0.5' : ''}`}
-              title="স্মার্ট ফ্রি ক্যালকুলেটর ও টুলস"
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'tools' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
             >
-              <Calculator className="w-3.5 h-3.5 text-amber-400" />
-              <span>ফ্রি টুলস</span>
+              টুলস
+            </button>
+            <button 
+              onClick={() => {
+                const navCards = document.getElementById('primary-service-cards');
+                if (navCards) {
+                  navCards.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  setCurrentView('home');
+                  window.scrollTo({ top: 500, behavior: 'smooth' });
+                }
+              }} 
+              className="hover:text-[#FACC15] transition py-1 cursor-pointer"
+            >
+              অ্যাপ
             </button>
           </nav>
 
-          {/* RIGHT: Action Buttons (Glass Notification, Glass Cart, User Profile Dropdown / Login Pill) */}
-          <div className="flex items-center gap-2 sm:gap-2.5 md:gap-3">
-            {/* 1. Notification Button (Circular Glass Pill) */}
-            <button 
-              onClick={onOpenNotifications} 
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 hover:text-white flex items-center justify-center transition shadow-inner active:scale-95 group"
-              title="নোটিফিকেশন ও আপডেট"
-            >
-              <Bell className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
-            </button>
-
-            {/* 2. Cart Button (Glass Rounded Square with Gold Count Badge) */}
-            <button 
-              onClick={() => setIsCartOpen(true)} 
-              className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 hover:text-white flex items-center justify-center transition shadow-inner active:scale-95 group"
-              title="শপিং কার্ট"
-            >
-              <ShoppingBag className="w-4 h-4 sm:w-5 sm:h-5 group-hover:scale-110 transition-transform" />
-              {totalCount > 0 && (
-                <span className="absolute -top-1.5 -right-1.5 bg-amber-400 text-slate-950 text-[10px] sm:text-[11px] font-black rounded-full min-w-[20px] h-5 px-1 flex items-center justify-center shadow-md border-2 border-emerald-900 animate-pulse">
-                  {totalCount}
-                </span>
-              )}
-            </button>
-
-            {/* 3. Login / User Profile Dropdown Pill */}
+          {/* RIGHT: Action Buttons (Only Reference-styled Login Dropdown & Mobile Hamburger Toggle) */}
+          <div className="flex items-center gap-2 sm:gap-3">
+            {/* Reference-Styled Login / User Pill */}
             {currentUser ? (
-              <div className="flex items-center gap-1 sm:gap-1.5">
+              <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
                   onClick={() => {
                     if (isAdmin) {
@@ -232,18 +215,14 @@ export const Header: React.FC<HeaderProps> = ({
                     }
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-white hover:bg-slate-100 text-slate-900 font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 transition active:scale-95 max-w-[110px] sm:max-w-[160px] truncate"
+                  className="px-3.5 sm:px-4 py-2 rounded-full bg-[#06381e] hover:bg-[#084827] text-white border border-amber-400/90 font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 transition active:scale-95 max-w-[140px] sm:max-w-[170px] truncate cursor-pointer group"
                   title={isAdmin ? 'অ্যাডমিন ড্যাশবোর্ড খুলুন' : userProfile?.role === 'seller' ? 'সেলার ড্যাশবোর্ড খুলুন' : 'ইউজার ড্যাশবোর্ড খুলুন'}
                 >
-                  {isAdmin ? (
-                    <ShieldCheck className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                  ) : (
-                    <User className="w-3.5 h-3.5 text-emerald-700 shrink-0" />
-                  )}
+                  <User className="w-3.5 h-3.5 text-amber-400 shrink-0" />
                   <span className="truncate">
                     {isAdmin ? 'অ্যাডমিন' : (userProfile?.fullName || currentUser.email?.split('@')[0])}
                   </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-slate-600 shrink-0 hidden sm:inline" />
+                  <ChevronDown className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover:translate-y-0.5 transition-transform" />
                 </button>
                 <button
                   onClick={async () => {
@@ -251,8 +230,9 @@ export const Header: React.FC<HeaderProps> = ({
                     setCurrentView('home');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-9 h-9 rounded-full bg-emerald-950/60 hover:bg-rose-600 text-emerald-200 hover:text-white border border-emerald-500/40 flex items-center justify-center transition shadow-sm active:scale-95"
-                  title="লগআউট করে হোমে যান"
+                  className="w-9 h-9 rounded-full bg-[#06381e] hover:bg-rose-700 text-amber-300 hover:text-white border border-amber-400/50 flex items-center justify-center transition shadow-sm active:scale-95 cursor-pointer"
+                  title="লগআউট"
+                  aria-label="লগআউট"
                 >
                   <LogOut className="w-4 h-4" />
                 </button>
@@ -262,64 +242,25 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => {
                   if (onOpenAuth) onOpenAuth('user-login');
                 }}
-                className="px-4 sm:px-5 py-1.5 sm:py-2 rounded-full bg-white hover:bg-slate-100 text-slate-950 font-black text-xs sm:text-sm shadow-md flex items-center gap-1 sm:gap-1.5 transition active:scale-95"
+                className="px-4 sm:px-5 py-2 rounded-full bg-[#06381e] hover:bg-[#084827] text-white border border-amber-400/90 font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 sm:gap-2 transition active:scale-95 cursor-pointer group"
               >
-                <span>লগইন</span>
-                <ChevronDown className="w-3.5 h-3.5 text-slate-700" />
+                <User className="w-4 h-4 text-amber-400" />
+                <span className="text-white">লগইন</span>
+                <ChevronDown className="w-3.5 h-3.5 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
               </button>
             )}
 
             {/* Mobile Drawer Menu Toggle */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-              className="xl:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-950/60 hover:bg-emerald-900 border border-emerald-500/40 text-white flex items-center justify-center transition active:scale-95"
+              className="xl:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-white flex items-center justify-center transition active:scale-95 cursor-pointer"
               aria-label="মোবাইল মেনু"
             >
               {mobileMenuOpen ? <X className="w-5 h-5 text-amber-300" /> : <Menu className="w-5 h-5" />}
             </button>
           </div>
         </div>
-
-        {/* 
-          SLIM GLASS ANNOUNCEMENT / NOTICE BAR
-          Directly integrated below the Header as in the reference design.
-        */}
-        <div className="bg-[#031d0e]/85 backdrop-blur-md text-emerald-100 text-xs py-2 px-4 border-t border-emerald-500/25 shadow-xs">
-          <div className="container mx-auto max-w-7xl flex items-center justify-between gap-3">
-            <div className="flex items-center gap-2 sm:gap-3 overflow-hidden">
-              {/* Yellow/Gold Badge: ● ঘোষণা */}
-              <span className="bg-amber-400 text-slate-950 text-[10px] sm:text-xs font-black px-2.5 sm:px-3 py-0.5 rounded-full uppercase tracking-wider shrink-0 shadow-xs flex items-center gap-1.5">
-                <span className="w-1.5 h-1.5 rounded-full bg-slate-950 animate-pulse" />
-                ঘোষণা
-              </span>
-
-              {/* Notice Title */}
-              <span className="font-black text-amber-300 truncate shrink-0 text-xs sm:text-sm">
-                {activeGlobalNotif?.title || 'ই-বুকবাজার বিশেষ নোটিশ:'}
-              </span>
-
-              {/* Notice Description */}
-              <span className="text-emerald-100/90 truncate text-[11px] sm:text-xs font-medium">
-                {activeGlobalNotif?.message || 'সকল ডিজিটাল বই ও ক্যারিয়ার গাইডে ৫০% পর্যন্ত ক্যাশব্যাক অফার! যেকোনো প্রয়োজনে ২৪/৭ কাস্টমার সাপোর্ট সক্রিয়।'}
-              </span>
-            </div>
-
-            {/* Right Arrow Indicator or Dismiss */}
-            <div className="flex items-center gap-2 shrink-0">
-              {activeGlobalNotif ? (
-                <button 
-                  onClick={() => setActiveGlobalNotif(null)} 
-                  className="text-emerald-300 hover:text-white text-xs font-bold px-1.5 py-0.5 rounded bg-emerald-900/60 hover:bg-emerald-800"
-                  title="বন্ধ করুন"
-                >
-                  ✕
-                </button>
-              ) : (
-                <ChevronRight className="w-4 h-4 text-emerald-400 hidden sm:block opacity-75" />
-              )}
-            </div>
-          </div>
-        </div>
+      </div>
 
         {/* Mobile Dropdown Navigation Drawer */}
         {mobileMenuOpen && (
@@ -331,6 +272,13 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Home className="w-4 h-4 text-amber-400" />
                 <span>মার্কেটপ্লেস</span>
+              </button>
+              <button 
+                onClick={() => { setCurrentView('ebooks'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
+                className="text-left p-2.5 rounded-xl bg-emerald-900/60 hover:bg-emerald-800 border border-emerald-700/50 flex items-center gap-2"
+              >
+                <BookOpen className="w-4 h-4 text-emerald-400" />
+                <span>ই-বুক ক্যাটালগ</span>
               </button>
               <button 
                 onClick={() => { setCurrentView('blog'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
@@ -462,7 +410,6 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
           </div>
         )}
-      </div>
     </header>
   );
 };
