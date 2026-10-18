@@ -3,9 +3,9 @@ import react from '@vitejs/plugin-react';
 import path from 'path';
 import {defineConfig} from 'vite';
 
-export default defineConfig(() => {
+export default defineConfig(({ command }) => {
   return {
-    base: process.env.GITHUB_PAGES === 'true' ? '/My-ebook-bazar/' : '/',
+    base: command === 'serve' ? '/' : (process.env.VITE_BASE_PATH || '/My-ebook-bazar/'),
     plugins: [react(), tailwindcss()],
     resolve: {
       alias: {
