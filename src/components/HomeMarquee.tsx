@@ -27,8 +27,8 @@ export const HomeMarquee: React.FC<HomeMarqueeProps> = React.memo(({
     duration = '18s';
   }
 
-  const text = settings.text || 'নতুন eBook প্রকাশিত হয়েছে! এখনই দেখে নিন এবং আপনার জ্ঞানের ভাণ্ডার সমৃদ্ধ করুন।';
-  const bgColor = settings.bgColor || '#f0fdf4';
+  const text = settings.text || 'আমাদের নতুন eBook কালেকশন এখন লাইভ! প্রতিদিন নতুন বই যুক্ত হচ্ছে। এখনই আপনার পছন্দের বইটি সংগ্রহ করুন।';
+  const bgColor = settings.bgColor || '#eaf7ee';
   const textColor = settings.textColor || '#064e3b';
 
   const [isPaused, setIsPaused] = React.useState(false);

@@ -135,13 +135,16 @@ export const Header: React.FC<HeaderProps> = ({
           </div>
 
           {/* CENTER: Desktop Quick Navigation Links Matching Reference (হোম, eBook, ব্লগ, সেলার, অ্যাফিলিয়েট, টুলস, অ্যাপ) */}
-          <nav className="hidden lg:flex items-center gap-4 xl:gap-6 text-xs lg:text-sm font-bold text-white">
+          <nav className="hidden md:flex items-center gap-2.5 lg:gap-4 xl:gap-6 text-xs lg:text-sm font-bold text-white shrink-0">
             <button 
               onClick={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-[#FACC15] transition py-1 cursor-pointer flex items-center gap-1.5 ${currentView === 'home' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : 'text-white'}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer flex items-center gap-1.5 relative ${currentView === 'home' ? 'text-[#FACC15]' : 'text-white'}`}
             >
               <Home className="w-3.5 h-3.5 text-[#FACC15]" />
               <span>হোম</span>
+              {currentView === 'home' && (
+                <span className="absolute -bottom-1.5 left-0 w-full h-[2.5px] bg-[#FACC15] rounded-full shadow-2xs" />
+              )}
             </button>
             <button 
               onClick={() => { setCurrentView('ebooks'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
