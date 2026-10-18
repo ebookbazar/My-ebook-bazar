@@ -138,10 +138,18 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
     }, 4500);
   };
 
-  // Admin Login State & Handlers
+  // Admin Login State & Handlers — kept strictly empty by default (no prefill, no saved email)
   const [loginEmail, setLoginEmail] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [loggingIn, setLoggingIn] = useState(false);
+
+  // Keep admin credentials input strictly empty when unauthenticated
+  useEffect(() => {
+    if (!currentUser) {
+      setLoginEmail('');
+      setLoginPassword('');
+    }
+  }, [currentUser]);
 
   const handleGoToHome = () => {
     if (typeof window !== 'undefined') {
@@ -176,24 +184,14 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
       setTickets({});
       setLoginEmail('');
       setLoginPassword('');
-      showToast('info', 'অ্যাডমিন অ্যাকাউন্ট থেকে লগআউট সম্পন্ন হয়েছে।');
+      setActiveTab('overview');
+      showToast('info', 'অ্যাডমিন অ্যাকাউন্ট থেকে লগআউট সম্পন্ন হয়েছে। পুনরায় প্রবেশ করতে লগইন করুন।');
     } catch (err: any) {
       console.error('Logout error:', err);
-    } finally {
-      if (typeof window !== 'undefined') {
-        if (window.location.hash.toLowerCase() === '#admin') {
-          window.history.replaceState(null, '', window.location.pathname || '/');
-        }
-        if (window.location.pathname.startsWith('/admin')) {
-          window.history.replaceState(null, '', '/');
-        }
-      }
-      onClose();
-      if (onNavigateHome) {
-        onNavigateHome();
-      }
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      showToast('error', 'লগআউট করতে সমস্যা হয়েছে: ' + (err?.message || err));
     }
+    // Note: Do NOT call onClose() or onNavigateHome().
+    // The modal stays open, currentUser becomes null, and the Admin Login form remains displayed with an empty email field.
   };
 
   const handleAdminLogin = async (e: React.FormEvent) => {
@@ -2239,7 +2237,8 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({
                     required
                     value={loginEmail}
                     onChange={(e) => setLoginEmail(e.target.value)}
-                    placeholder="admin@ebookbazar.com"
+                    placeholder="অ্যাডমিন ইমেইল লিখুন"
+                    autoComplete="off"
                     className="w-full pl-10 pr-4 py-2.5 rounded-xl border border-slate-300 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 focus:bg-white transition"
                   />
                 </div>
@@ -4667,7 +4666,7 @@ service cloud.firestore {
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400">Password:</span>
-                        <span className="font-bold text-emerald-400">Admin@123456</span>
+                        <span className="font-bold text-emerald-400">•••••••• (নিরাপদ পাসওয়ার্ড)</span>
                       </div>
                       <div className="flex justify-between">
                         <span className="text-slate-400">Role:</span>
@@ -4675,7 +4674,7 @@ service cloud.firestore {
                       </div>
                     </div>
                     <p className="text-[11px] text-slate-400 mt-2">
-                      💡 আপনি হোমপেজের হেডার বা টপ বার থেকে <b>"⚡ কুইক লগইন: অ্যাডমিন"</b> বাটনে ক্লিক করেই তাৎক্ষণিক অ্যাডমিন ড্যাশবোর্ডে প্রবেশ করতে পারবেন।
+                      💡 অ্যাডমিন প্যানেলে লগইন করার জন্য অ্যাডমিন ইমেইল ও পাসওয়ার্ড প্রদান করে নিরাপদে প্রবেশ করুন।
                     </p>
                   </div>
 

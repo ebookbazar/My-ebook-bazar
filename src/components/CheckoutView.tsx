@@ -115,18 +115,15 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
 
     setSubmitting(true);
     const isGuest = !currentUser;
+    if (!currentUser && !auth.currentUser) {
+      alert('অর্ডার সাবমিট করতে দয়া করে প্রথমে সাইন-ইন বা লগইন করুন।');
+      setSubmitting(false);
+      return;
+    }
+
     try {
       // Create separate order entries or bundled entry with unique Order ID
       const ordersRef = ref(db, 'orders');
-
-      // If guest/unauthenticated user, temporarily ensure authorized write access to persist order record
-      if (isGuest && !auth.currentUser) {
-        try {
-          await signInWithEmailAndPassword(auth, 'admin@ebookbazar.com', 'Admin@123456');
-        } catch (authErr) {
-          console.warn('Guest checkout temporary write auth notice:', authErr);
-        }
-      }
       
       for (const item of itemsToBuy) {
         const orderKey = push(ordersRef).key || `ORD-${Date.now()}`;
@@ -170,10 +167,6 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       }
 
       // If this was a guest order, sign out immediately so client session remains guest/unauthenticated
-      if (isGuest) {
-        await signOut(auth).catch(() => {});
-      }
-
       if (!directItem) {
         clearCart();
       }
@@ -184,10 +177,6 @@ export const CheckoutView: React.FC<CheckoutViewProps> = ({
       console.error('Order submission error:', err);
       alert('অর্ডার সাবমিট করতে সমস্যা হয়েছে: ' + (err?.message || err));
       setSubmitting(false);
-    } finally {
-      if (isGuest && auth.currentUser?.email === 'admin@ebookbazar.com') {
-        await signOut(auth).catch(() => {});
-      }
     }
   };
 

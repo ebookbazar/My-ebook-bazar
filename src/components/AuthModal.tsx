@@ -21,6 +21,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
   useEffect(() => {
     setMode(initialMode);
     setError(null);
+    setEmail('');
+    setPassword('');
   }, [initialMode, isOpen]);
   
   // Form fields
@@ -201,7 +203,8 @@ export const AuthModal: React.FC<AuthModalProps> = ({
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full pl-9 pr-3 py-2.5 rounded-xl border border-slate-300 text-sm focus:ring-2 focus:ring-emerald-600"
-                placeholder="name@example.com"
+                placeholder={mode === 'admin-login' ? 'অ্যাডমিন ইমেইল লিখুন' : 'name@example.com'}
+                autoComplete="off"
               />
               <Mail className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
             </div>
