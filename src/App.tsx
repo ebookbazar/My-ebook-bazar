@@ -794,16 +794,20 @@ function MainApp() {
     }
   }, [currentView]);
 
-  // When User, Seller, or Admin logs out, automatically show Home page and close admin panel
+  // When User or Seller logs out, automatically show Home page.
+  // When Admin logs out from AdminPanel, keep Admin Login form visible as required.
   const prevUserRef = React.useRef(currentUser);
   useEffect(() => {
     if (prevUserRef.current && !currentUser) {
-      setCurrentView('home');
-      setIsAdminOpen(false);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (isAdminOpen) {
+        // Explicitly keep the Admin Login form visible without closing or redirecting to home
+      } else {
+        setCurrentView('home');
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      }
     }
     prevUserRef.current = currentUser;
-  }, [currentUser]);
+  }, [currentUser, isAdminOpen]);
 
   // Filtered & Sorted Ebooks
   const filteredEbooks = (ebooks || []).filter((b) => {

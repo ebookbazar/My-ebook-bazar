@@ -1,5 +1,5 @@
 import React from 'react';
-import { Megaphone, Settings, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Megaphone, Settings, ChevronLeft, ChevronRight, Pause, Play } from 'lucide-react';
 import { MarqueeSettings } from '../types';
 
 interface HomeMarqueeProps {
@@ -31,17 +31,22 @@ export const HomeMarquee: React.FC<HomeMarqueeProps> = React.memo(({
   const bgColor = settings.bgColor || '#f0fdf4';
   const textColor = settings.textColor || '#064e3b';
 
+  const [isPaused, setIsPaused] = React.useState(false);
+
   return (
     <div 
       className="relative overflow-hidden rounded-2xl shadow-xs border border-emerald-200/90 select-none group transition-all"
-      style={{ backgroundColor: bgColor, color: textColor }}
+      style={{ backgroundColor: bgColor || '#eaf7ee', color: textColor || '#064e3b' }}
       role="region"
       aria-label="ঘোষণা মারকুই"
     >
-      <div className="flex items-center h-11 sm:h-12 px-3.5 sm:px-4 gap-2 sm:gap-3">
-        {/* Left Megaphone Announcement Icon */}
-        <div className="shrink-0 flex items-center gap-1.5 text-emerald-800">
+      <div className="flex items-center h-11 sm:h-12 px-3 sm:px-4 gap-2 sm:gap-3">
+        {/* Left Megaphone Announcement Icon & Label matching IMAGE 1 */}
+        <div className="shrink-0 flex items-center gap-1.5 sm:gap-2 text-emerald-800">
           <Megaphone className="w-4 h-4 sm:w-5 sm:h-5 text-emerald-700 animate-pulse" />
+          <span className="font-black text-xs sm:text-sm text-[#064e3b] shrink-0 whitespace-nowrap">
+            গুরুত্বপূর্ণ নোটিশ:
+          </span>
         </div>
 
         {/* Scrolling text container */}
@@ -49,38 +54,48 @@ export const HomeMarquee: React.FC<HomeMarqueeProps> = React.memo(({
           <div 
             className="whitespace-nowrap flex items-center will-change-transform group-hover:[animation-play-state:paused]"
             style={{
-              animation: `marqueeScroll ${duration} linear infinite`
+              animation: `marqueeScroll ${duration} linear infinite`,
+              animationPlayState: isPaused ? 'paused' : 'running'
             }}
           >
-            <span className="font-bold text-xs sm:text-sm md:text-base tracking-wide inline-block pr-16">
+            <span className="font-bold text-xs sm:text-sm tracking-wide inline-block pr-16">
               {text}
             </span>
-            <span className="font-bold text-xs sm:text-sm md:text-base tracking-wide inline-block pr-16" aria-hidden="true">
+            <span className="font-bold text-xs sm:text-sm tracking-wide inline-block pr-16" aria-hidden="true">
               {text}
             </span>
-            <span className="font-bold text-xs sm:text-sm md:text-base tracking-wide inline-block pr-16" aria-hidden="true">
+            <span className="font-bold text-xs sm:text-sm tracking-wide inline-block pr-16" aria-hidden="true">
               {text}
             </span>
           </div>
         </div>
 
-        {/* Right Arrow Controls matching reference design */}
-        <div className="shrink-0 flex items-center gap-1 text-emerald-700">
+        {/* Right Arrow & Pause Controls matching reference design */}
+        <div className="shrink-0 flex items-center gap-1 text-emerald-700 bg-white/70 backdrop-blur-xs px-2 py-0.5 rounded-full border border-emerald-300/60 shadow-2xs">
           <button 
             type="button"
-            className="p-1 rounded-lg hover:bg-black/5 text-emerald-800 transition"
+            className="p-1 rounded-full hover:bg-black/5 text-emerald-800 transition cursor-pointer"
             aria-label="পূর্ববর্তী ঘোষণা"
             title="পূর্ববর্তী ঘোষণা"
           >
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3.5 h-3.5" />
           </button>
           <button 
             type="button"
-            className="p-1 rounded-lg hover:bg-black/5 text-emerald-800 transition"
+            onClick={() => setIsPaused(!isPaused)}
+            className="p-1 rounded-full hover:bg-black/5 text-emerald-800 transition cursor-pointer"
+            aria-label={isPaused ? "চালান" : "থামুন"}
+            title={isPaused ? "চালান" : "থামুন"}
+          >
+            {isPaused ? <Play className="w-3 h-3 text-emerald-800" /> : <Pause className="w-3 h-3 text-emerald-800" />}
+          </button>
+          <button 
+            type="button"
+            className="p-1 rounded-full hover:bg-black/5 text-emerald-800 transition cursor-pointer"
             aria-label="পরবর্তী ঘোষণা"
             title="পরবর্তী ঘোষণা"
           >
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
           </button>
 
           {/* Admin Quick Settings trigger if logged in as Admin */}
@@ -88,11 +103,11 @@ export const HomeMarquee: React.FC<HomeMarqueeProps> = React.memo(({
             <button
               onClick={onOpenAdminSettings}
               type="button"
-              className="ml-1 p-1.5 rounded-lg bg-emerald-800 text-white hover:bg-emerald-900 transition cursor-pointer"
+              className="ml-1 p-1 rounded-full bg-emerald-800 text-white hover:bg-emerald-900 transition cursor-pointer"
               title="মারকুই নোটিশ এডিট করুন (Admin)"
               aria-label="মারকুই নোটিশ এডিট করুন"
             >
-              <Settings className="w-3.5 h-3.5" />
+              <Settings className="w-3 h-3" />
             </button>
           )}
         </div>

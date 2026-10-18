@@ -81,14 +81,11 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full transition-all">
       {/* 
-        PREMIUM GLASSMORPHISM CAPSULE HEADER 
-        Inspired directly by the reference image with deep emerald translucent glass,
-        frosted blur, subtle specular highlights, official eBookBazar logo, and crisp buttons.
+        PREMIUM HEADER MATCHING REFERENCE DESIGN
+        Dark emerald green (#00563F), thin golden bottom border (#FACC15),
+        clean spacing, responsive typography, and crisp user actions.
       */}
-      <div className="bg-gradient-to-r from-[#032b18] via-[#053820] to-[#032b18] border-b border-amber-400/40 shadow-[0_4px_20px_rgba(0,0,0,0.35)] transition-all">
-        {/* Subtle golden reflection sheen on top */}
-        <div className="absolute top-0 inset-x-8 h-[1px] bg-gradient-to-r from-transparent via-amber-300/40 to-transparent pointer-events-none" />
-
+      <div className="bg-[#00563F] border-b border-[#FACC15] shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-all">
         {/* Top Header Row */}
         <div className="container mx-auto px-4 py-2.5 sm:py-3 max-w-7xl flex items-center justify-between gap-3 sm:gap-4">
           {/* LEFT: Official eBookBazar Logo & Brand */}
@@ -125,36 +122,36 @@ export const Header: React.FC<HeaderProps> = ({
             </div>
 
             {/* Brand Title */}
-            <div className="flex flex-col">
-              <div className="flex items-center gap-1.5">
+            <div className="flex flex-col justify-center">
+              <div className="flex items-center gap-1.5 leading-none">
                 <span className="text-xl sm:text-2xl md:text-[26px] font-black tracking-tight text-white drop-shadow-xs">
                   eBook<span className="text-[#FACC15]">Bazar</span>
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-emerald-200/90 font-medium tracking-wide -mt-0.5">
+              <p className="text-[11px] sm:text-xs text-emerald-100 font-medium tracking-wide mt-0.5">
                 পড়ুন • শিখুন • এগিয়ে যান
               </p>
             </div>
           </div>
 
-          {/* CENTER: Desktop Quick Navigation Links Matching Reference (হোম, eBook, ব্লগ, সেলার, অ্যাফিলিয়েট, টুলস, অ্যাপ) */}
-          <nav className="hidden lg:flex items-center gap-4 xl:gap-6 text-xs lg:text-sm font-bold text-emerald-100">
+          {/* CENTER: Desktop Quick Navigation Links Matching Reference (হোম, eBook, ব্লগ, সেলার, অ্যাফিলিয়েট, টুলস, অ্যাপ) */}
+          <nav className="hidden lg:flex items-center gap-4 xl:gap-6 text-xs lg:text-sm font-bold text-white">
             <button 
               onClick={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-[#FACC15] transition py-1 cursor-pointer flex items-center gap-1.5 ${currentView === 'home' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer flex items-center gap-1.5 ${currentView === 'home' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : 'text-white'}`}
             >
               <Home className="w-3.5 h-3.5 text-[#FACC15]" />
               <span>হোম</span>
             </button>
             <button 
               onClick={() => { setCurrentView('ebooks'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'ebooks' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'ebooks' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : 'text-white'}`}
             >
               eBook
             </button>
             <button 
               onClick={() => { setCurrentView('blog'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'blog' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'blog' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : 'text-white'}`}
             >
               ব্লগ
             </button>
@@ -167,19 +164,19 @@ export const Header: React.FC<HeaderProps> = ({
                 }
                 window.scrollTo({ top: 0, behavior: 'smooth' });
               }} 
-              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'seller-dashboard' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'seller-dashboard' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : 'text-white'}`}
             >
               সেলার
             </button>
             <button 
               onClick={() => { setCurrentView('affiliate'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'affiliate' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'affiliate' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : 'text-white'}`}
             >
-              অ্যাফিলিয়েট
+              অ্যাফিলিয়েট
             </button>
             <button 
               onClick={() => { setCurrentView('tools'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'tools' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : ''}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer ${currentView === 'tools' ? 'text-[#FACC15] border-b-2 border-[#FACC15] pb-0.5' : 'text-white'}`}
             >
               টুলস
             </button>
@@ -193,7 +190,7 @@ export const Header: React.FC<HeaderProps> = ({
                   window.scrollTo({ top: 500, behavior: 'smooth' });
                 }
               }} 
-              className="hover:text-[#FACC15] transition py-1 cursor-pointer"
+              className="hover:text-[#FACC15] transition py-1 cursor-pointer text-white"
             >
               অ্যাপ
             </button>
@@ -215,14 +212,14 @@ export const Header: React.FC<HeaderProps> = ({
                     }
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="px-3.5 sm:px-4 py-2 rounded-full bg-[#06381e] hover:bg-[#084827] text-white border border-amber-400/90 font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 transition active:scale-95 max-w-[140px] sm:max-w-[170px] truncate cursor-pointer group"
+                  className="px-3.5 sm:px-4 py-2 rounded-full bg-[#004834] hover:bg-[#003b2b] text-white border border-[#FACC15] font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 transition active:scale-95 max-w-[140px] sm:max-w-[170px] truncate cursor-pointer group"
                   title={isAdmin ? 'অ্যাডমিন ড্যাশবোর্ড খুলুন' : userProfile?.role === 'seller' ? 'সেলার ড্যাশবোর্ড খুলুন' : 'ইউজার ড্যাশবোর্ড খুলুন'}
                 >
-                  <User className="w-3.5 h-3.5 text-amber-400 shrink-0" />
+                  <User className="w-3.5 h-3.5 text-[#FACC15] shrink-0" />
                   <span className="truncate">
                     {isAdmin ? 'অ্যাডমিন' : (userProfile?.fullName || currentUser.email?.split('@')[0])}
                   </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-amber-400 shrink-0 group-hover:translate-y-0.5 transition-transform" />
+                  <ChevronDown className="w-3.5 h-3.5 text-[#FACC15] shrink-0 group-hover:translate-y-0.5 transition-transform" />
                 </button>
                 <button
                   onClick={async () => {
@@ -230,7 +227,7 @@ export const Header: React.FC<HeaderProps> = ({
                     setCurrentView('home');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-9 h-9 rounded-full bg-[#06381e] hover:bg-rose-700 text-amber-300 hover:text-white border border-amber-400/50 flex items-center justify-center transition shadow-sm active:scale-95 cursor-pointer"
+                  className="w-9 h-9 rounded-full bg-[#004834] hover:bg-rose-700 text-[#FACC15] hover:text-white border border-[#FACC15]/70 flex items-center justify-center transition shadow-sm active:scale-95 cursor-pointer"
                   title="লগআউট"
                   aria-label="লগআউট"
                 >
@@ -242,29 +239,30 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => {
                   if (onOpenAuth) onOpenAuth('user-login');
                 }}
-                className="px-4 sm:px-5 py-2 rounded-full bg-[#06381e] hover:bg-[#084827] text-white border border-amber-400/90 font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 sm:gap-2 transition active:scale-95 cursor-pointer group"
+                className="px-4 sm:px-5 py-2 rounded-full bg-[#004834] hover:bg-[#003b2b] text-white border border-[#FACC15] font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 sm:gap-2 transition active:scale-95 cursor-pointer group"
               >
-                <User className="w-4 h-4 text-amber-400" />
+                <User className="w-4 h-4 text-[#FACC15]" />
                 <span className="text-white">লগইন</span>
-                <ChevronDown className="w-3.5 h-3.5 text-amber-400 group-hover:translate-y-0.5 transition-transform" />
+                <ChevronDown className="w-3.5 h-3.5 text-[#FACC15] group-hover:translate-y-0.5 transition-transform" />
               </button>
             )}
 
-            {/* Mobile Drawer Menu Toggle */}
+            {/* Circular Drawer Menu Toggle matching IMAGE 1 */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-              className="xl:hidden w-9 h-9 sm:w-10 sm:h-10 rounded-xl bg-emerald-950/70 hover:bg-emerald-900 border border-emerald-500/40 text-white flex items-center justify-center transition active:scale-95 cursor-pointer"
-              aria-label="মোবাইল মেনু"
+              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#004834] hover:bg-[#003b2b] border border-[#FACC15]/80 text-white flex items-center justify-center transition shadow-sm active:scale-95 cursor-pointer"
+              aria-label="মেনু খুলুন"
+              title="সকল মেনু ও ফিচার"
             >
-              {mobileMenuOpen ? <X className="w-5 h-5 text-amber-300" /> : <Menu className="w-5 h-5" />}
+              {mobileMenuOpen ? <X className="w-5 h-5 text-[#FACC15]" /> : <Menu className="w-5 h-5 text-white" />}
             </button>
           </div>
         </div>
       </div>
 
-        {/* Mobile Dropdown Navigation Drawer */}
+        {/* Dropdown Navigation Drawer (Available for mobile and quick desktop access) */}
         {mobileMenuOpen && (
-          <div className="xl:hidden bg-[#042513]/95 backdrop-blur-2xl border-t border-emerald-500/30 px-4 py-4 space-y-3 text-sm font-bold text-white shadow-2xl animate-fadeIn">
+          <div className="bg-[#004230]/98 backdrop-blur-2xl border-t border-[#FACC15]/30 px-4 py-4 space-y-3 text-sm font-bold text-white shadow-2xl animate-fadeIn">
             <div className="grid grid-cols-2 gap-2 pb-3 border-b border-emerald-800/60">
               <button 
                 onClick={() => { setCurrentView('home'); setMobileMenuOpen(false); window.scrollTo({ top: 0, behavior: 'smooth' }); }}
