@@ -81,11 +81,12 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 w-full transition-all">
       {/* 
-        PREMIUM HEADER MATCHING REFERENCE DESIGN
-        Dark emerald green (#00563F), thin golden bottom border (#FACC15),
-        clean spacing, responsive typography, and crisp user actions.
+        PREMIUM HEADER EXACTLY MATCHING REFERENCE IMAGE 1
+        Dark emerald green (#00563F), solid golden yellow bottom border (#FACC15),
+        circular logo with white border, horizontal navigation with yellow active indicator,
+        login button with user icon, and circular hamburger menu.
       */}
-      <div className="bg-[#00563F] border-b border-[#FACC15] shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-all">
+      <div className="bg-[#00563F] border-b-2 border-[#FACC15] shadow-[0_4px_16px_rgba(0,0,0,0.25)] transition-all">
         {/* Top Header Row */}
         <div className="container mx-auto px-4 py-2.5 sm:py-3 max-w-7xl flex items-center justify-between gap-3 sm:gap-4">
           {/* LEFT: Official eBookBazar Logo & Brand */}
@@ -94,56 +95,56 @@ export const Header: React.FC<HeaderProps> = ({
               setCurrentView('home');
               window.scrollTo({ top: 0, behavior: 'smooth' });
             }} 
-            className="flex items-center gap-2.5 sm:gap-3 cursor-pointer select-none group shrink-0"
+            className="flex items-center gap-2.5 sm:gap-3.5 cursor-pointer select-none group shrink-0"
             title="eBookBazar হোম পেজে ফিরে যান"
           >
-            {/* Official Logo with Golden Crest */}
-            <div className="relative w-10 h-10 sm:w-11 sm:h-11 rounded-full p-0.5 bg-gradient-to-tr from-amber-400 via-amber-200 to-amber-500 shadow-md group-hover:scale-105 transition-transform duration-200 shrink-0">
-              <picture>
+            {/* Official Logo: Clean white circular border matching reference image with slightly increased size */}
+            <div className="relative w-11 h-11 sm:w-12 sm:h-12 md:w-14 md:h-14 rounded-full border-2 border-white bg-[#004834] overflow-hidden shadow-md group-hover:scale-105 transition-transform duration-200 shrink-0 flex items-center justify-center">
+              <picture className="w-full h-full block">
                 <source srcSet={`${(import.meta.env.BASE_URL || '/').replace(/\/$/, '')}/ebookbazar-logo.webp`} type="image/webp" />
                 <img 
                   src={`${(import.meta.env.BASE_URL || '/').replace(/\/$/, '')}/ebookbazar-logo.jpg`} 
                   alt="eBookBazar Official Logo" 
-                  width={44}
-                  height={44}
+                  width={56}
+                  height={56}
                   decoding="async"
-                  className="w-full h-full rounded-full object-cover"
+                  className="w-full h-full object-cover"
                   referrerPolicy="no-referrer"
                   onError={(e) => {
                     const target = e.currentTarget;
                     target.style.display = 'none';
                     if (target.parentElement) {
                       target.parentElement.classList.add('flex', 'items-center', 'justify-center', 'bg-emerald-900');
-                      target.parentElement.innerHTML = `<span class="text-amber-400 font-black text-sm">EB</span>`;
+                      target.parentElement.innerHTML = `<span class="text-amber-400 font-black text-base">EB</span>`;
                     }
                   }}
                 />
               </picture>
             </div>
 
-            {/* Brand Title */}
+            {/* Brand Title: Increased size and bold tagline */}
             <div className="flex flex-col justify-center">
               <div className="flex items-center gap-1.5 leading-none">
-                <span className="text-xl sm:text-2xl md:text-[26px] font-black tracking-tight text-white drop-shadow-xs">
+                <span className="text-2xl sm:text-[26px] md:text-3xl lg:text-[32px] font-black tracking-tight text-white drop-shadow-xs font-sans">
                   eBook<span className="text-[#FACC15]">Bazar</span>
                 </span>
               </div>
-              <p className="text-[11px] sm:text-xs text-emerald-100 font-medium tracking-wide mt-0.5">
+              <p className="text-xs sm:text-[13px] md:text-sm text-emerald-100 font-semibold tracking-wide mt-1">
                 পড়ুন • শিখুন • এগিয়ে যান
               </p>
             </div>
           </div>
 
-          {/* CENTER: Desktop Quick Navigation Links Matching Reference (হোম, eBook, ব্লগ, সেলার, অ্যাফিলিয়েট, টুলস, অ্যাপ) */}
-          <nav className="hidden md:flex items-center gap-2.5 lg:gap-4 xl:gap-6 text-xs lg:text-sm font-bold text-white shrink-0">
+          {/* CENTER: Desktop Navigation with Larger, Bold, Highly Readable Text */}
+          <nav className="hidden sm:flex items-center gap-2 md:gap-3.5 lg:gap-5 xl:gap-6 text-sm sm:text-[15px] lg:text-base font-extrabold text-white shrink-0">
             <button 
               onClick={() => { setCurrentView('home'); window.scrollTo({ top: 0, behavior: 'smooth' }); }} 
-              className={`hover:text-[#FACC15] transition py-1 cursor-pointer flex items-center gap-1.5 relative ${currentView === 'home' ? 'text-[#FACC15]' : 'text-white'}`}
+              className={`hover:text-[#FACC15] transition py-1 cursor-pointer flex items-center gap-1 sm:gap-1.5 relative ${currentView === 'home' ? 'text-[#FACC15]' : 'text-white'}`}
             >
-              <Home className="w-3.5 h-3.5 text-[#FACC15]" />
+              <Home className="w-4 h-4 text-[#FACC15]" />
               <span>হোম</span>
               {currentView === 'home' && (
-                <span className="absolute -bottom-1.5 left-0 w-full h-[2.5px] bg-[#FACC15] rounded-full shadow-2xs" />
+                <span className="absolute -bottom-1.5 left-0 w-full h-[3px] bg-[#FACC15] rounded-full shadow-2xs" />
               )}
             </button>
             <button 
@@ -199,9 +200,9 @@ export const Header: React.FC<HeaderProps> = ({
             </button>
           </nav>
 
-          {/* RIGHT: Action Buttons (Only Reference-styled Login Dropdown & Mobile Hamburger Toggle) */}
+          {/* RIGHT: Action Buttons (Increased Login Button Size & Hamburger Menu on Far Right) */}
           <div className="flex items-center gap-2 sm:gap-3">
-            {/* Reference-Styled Login / User Pill */}
+            {/* Reference-Styled Login / User Pill with Larger Text */}
             {currentUser ? (
               <div className="flex items-center gap-1.5 sm:gap-2">
                 <button
@@ -215,14 +216,14 @@ export const Header: React.FC<HeaderProps> = ({
                     }
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="px-3.5 sm:px-4 py-2 rounded-full bg-[#004834] hover:bg-[#003b2b] text-white border border-[#FACC15] font-bold text-xs sm:text-sm shadow-md flex items-center gap-2 transition active:scale-95 max-w-[140px] sm:max-w-[170px] truncate cursor-pointer group"
+                  className="px-3.5 sm:px-5 py-2 sm:py-2.5 rounded-full bg-[#004834] hover:bg-[#003b2b] text-white border-2 border-[#FACC15] font-extrabold text-xs sm:text-base shadow-md flex items-center gap-2 transition active:scale-95 max-w-[140px] sm:max-w-[190px] truncate cursor-pointer group"
                   title={isAdmin ? 'অ্যাডমিন ড্যাশবোর্ড খুলুন' : userProfile?.role === 'seller' ? 'সেলার ড্যাশবোর্ড খুলুন' : 'ইউজার ড্যাশবোর্ড খুলুন'}
                 >
-                  <User className="w-3.5 h-3.5 text-[#FACC15] shrink-0" />
+                  <User className="w-4 h-4 text-[#FACC15] shrink-0" />
                   <span className="truncate">
                     {isAdmin ? 'অ্যাডমিন' : (userProfile?.fullName || currentUser.email?.split('@')[0])}
                   </span>
-                  <ChevronDown className="w-3.5 h-3.5 text-[#FACC15] shrink-0 group-hover:translate-y-0.5 transition-transform" />
+                  <ChevronDown className="w-4 h-4 text-[#FACC15] shrink-0 group-hover:translate-y-0.5 transition-transform" />
                 </button>
                 <button
                   onClick={async () => {
@@ -230,7 +231,7 @@ export const Header: React.FC<HeaderProps> = ({
                     setCurrentView('home');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="w-9 h-9 rounded-full bg-[#004834] hover:bg-rose-700 text-[#FACC15] hover:text-white border border-[#FACC15]/70 flex items-center justify-center transition shadow-sm active:scale-95 cursor-pointer"
+                  className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#004834] hover:bg-rose-700 text-[#FACC15] hover:text-white border border-[#FACC15]/70 flex items-center justify-center transition shadow-sm active:scale-95 cursor-pointer"
                   title="লগআউট"
                   aria-label="লগআউট"
                 >
@@ -242,18 +243,18 @@ export const Header: React.FC<HeaderProps> = ({
                 onClick={() => {
                   if (onOpenAuth) onOpenAuth('user-login');
                 }}
-                className="px-4 sm:px-5 py-2 rounded-full bg-[#004834] hover:bg-[#003b2b] text-white border border-[#FACC15] font-bold text-xs sm:text-sm shadow-md flex items-center gap-1.5 sm:gap-2 transition active:scale-95 cursor-pointer group"
+                className="px-4 sm:px-6 py-2 sm:py-2.5 rounded-full bg-[#004834] hover:bg-[#003b2b] text-white border-2 border-[#FACC15] font-extrabold text-sm sm:text-base shadow-md flex items-center gap-2 transition active:scale-95 cursor-pointer group"
               >
-                <User className="w-4 h-4 text-[#FACC15]" />
+                <User className="w-4 h-4 sm:w-5 sm:h-5 text-[#FACC15]" />
                 <span className="text-white">লগইন</span>
-                <ChevronDown className="w-3.5 h-3.5 text-[#FACC15] group-hover:translate-y-0.5 transition-transform" />
+                <ChevronDown className="w-4 h-4 text-[#FACC15] group-hover:translate-y-0.5 transition-transform" />
               </button>
             )}
 
-            {/* Circular Drawer Menu Toggle matching IMAGE 1 */}
+            {/* Circular Hamburger Menu on the Far Right */}
             <button 
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)} 
-              className="w-9 h-9 sm:w-10 sm:h-10 rounded-full bg-[#004834] hover:bg-[#003b2b] border border-[#FACC15]/80 text-white flex items-center justify-center transition shadow-sm active:scale-95 cursor-pointer"
+              className="w-9 h-9 sm:w-11 sm:h-11 rounded-full bg-[#004834] hover:bg-[#003b2b] border-2 border-[#FACC15] text-white flex items-center justify-center transition shadow-sm active:scale-95 cursor-pointer shrink-0"
               aria-label="মেনু খুলুন"
               title="সকল মেনু ও ফিচার"
             >
