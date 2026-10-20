@@ -73,7 +73,7 @@ export const FloatingSearch: React.FC<FloatingSearchProps> = ({
         type="button"
         onClick={() => setIsOpen(true)}
         aria-label="ই-বুক ও ব্লগ খুঁজুন"
-        className="fixed bottom-24 right-6 z-40 bg-emerald-700/95 hover:bg-emerald-800 text-white p-3.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg shadow-emerald-950/20 hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2 border border-emerald-500/40 group backdrop-blur-sm"
+        className="fixed bottom-24 md:bottom-28 lg:bottom-32 right-4 sm:right-6 md:right-8 z-40 bg-emerald-700/95 hover:bg-emerald-800 text-white p-3.5 sm:px-4 sm:py-2.5 rounded-full shadow-lg shadow-emerald-950/20 hover:shadow-xl hover:scale-105 active:scale-95 transition-all duration-200 flex items-center gap-2 border border-emerald-500/40 group backdrop-blur-sm"
       >
         <Search className="w-4 h-4 sm:w-5 sm:h-5 text-amber-300 group-hover:rotate-12 transition-transform duration-200" />
         <span className="text-xs font-bold tracking-wide hidden sm:inline">

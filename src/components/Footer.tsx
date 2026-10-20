@@ -71,7 +71,7 @@ export const Footer: React.FC<FooterProps> = ({
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer role="contentinfo" className="w-full mt-6 sm:mt-8 pb-8 px-3 sm:px-4">
+    <footer role="contentinfo" className="w-full mt-auto pt-6 sm:pt-8 pb-2 sm:pb-3 px-3 sm:px-4">
       {/* 
         PREMIUM GLASSMORPHISM FOOTER CONTAINER
         Deep emerald translucent glass with delicate specular border highlight,
