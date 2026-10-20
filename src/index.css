@@ -6,30 +6,34 @@
 
 html, body, #root {
   min-height: 100%;
+  background-color: #f1f5f9;
 }
 
 body {
   font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
   scroll-behavior: smooth;
+  background-color: #f1f5f9;
 }
 
 /* ======================================================== */
 /* DESKTOP HOMEPAGE SPACING (min-width: 1024px)             */
 /* Eliminates excessive gap below the 6 category cards      */
-/* and eliminates excessive whitespace below the footer.    */
-/* Footer sits naturally after page content without extra   */
-/* min-height, bottom margins, or empty spacers.            */
+/* and eliminates blank white area below the footer.        */
+/* Footer sits naturally after page content with normal     */
+/* ~16-24px bottom spacing (padding-bottom: 20px).          */
 /* Mobile (< 1024px) and tablet remain completely unchanged.*/
 /* ======================================================== */
 @media (min-width: 1024px) {
   html, body, #root {
     min-height: auto !important;
     height: auto !important;
+    background-color: #f1f5f9 !important;
   }
 
   #root > div {
     min-height: auto !important;
     height: auto !important;
+    background-color: #f1f5f9 !important;
   }
 
   main {
@@ -42,7 +46,7 @@ body {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
     padding-top: 16px !important;
-    padding-bottom: 8px !important;
+    padding-bottom: 20px !important;
     height: auto !important;
     min-height: 0 !important;
   }
