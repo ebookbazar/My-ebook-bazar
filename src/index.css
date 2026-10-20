@@ -22,10 +22,12 @@ body {
 @media (min-width: 1024px) {
   main {
     flex: none !important;
+    height: auto !important;
+    min-height: 0 !important;
   }
   footer[role="contentinfo"] {
     margin-top: 0 !important;
-    padding-top: 20px !important;
+    padding-top: 16px !important;
   }
 }
 
