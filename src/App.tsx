@@ -877,7 +877,7 @@ function MainApp() {
       />
 
       {/* Main Content Area */}
-      <main className="flex-1 w-full container mx-auto px-3 sm:px-4 max-w-7xl pt-3 sm:pt-4 space-y-4 sm:space-y-6">
+      <main className="flex-1 lg:flex-none w-full container mx-auto px-3 sm:px-4 max-w-7xl pt-3 sm:pt-4 space-y-4 sm:space-y-6">
         {/* VIEW 1: HOME MARKETPLACE */}
         {currentView === 'home' && (
           <div className="space-y-3 sm:space-y-4 pb-2 sm:pb-3">

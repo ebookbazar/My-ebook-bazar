@@ -13,6 +13,22 @@ body {
   scroll-behavior: smooth;
 }
 
+/* ======================================================== */
+/* DESKTOP HOMEPAGE SPACING (min-width: 1024px)             */
+/* Eliminates excessive gap below the 6 category cards      */
+/* and lets the footer naturally follow with ~24-32px gap.  */
+/* Mobile (< 1024px) and tablet remain completely unchanged.*/
+/* ======================================================== */
+@media (min-width: 1024px) {
+  main {
+    flex: none !important;
+  }
+  footer[role="contentinfo"] {
+    margin-top: 0 !important;
+    padding-top: 20px !important;
+  }
+}
+
 @keyframes softFadeIn {
   from {
     opacity: 0;
