@@ -384,7 +384,7 @@ export const Footer: React.FC<FooterProps> = ({
           <button 
             type="button"
             onClick={scrollToTop} 
-            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 hover:text-white font-bold transition shadow-sm active:scale-95 group focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shrink-0"
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-emerald-950/80 hover:bg-emerald-900 border border-emerald-500/40 text-emerald-200 hover:text-white font-bold transition shadow-sm active:scale-95 group focus:outline-none focus:ring-2 focus:ring-amber-400 cursor-pointer shrink-0 sm:mr-24 lg:mr-28"
             title="উপরে স্ক্রোল করুন"
             aria-label="পৃষ্ঠার শুরুতে স্ক্রোল করুন"
           >

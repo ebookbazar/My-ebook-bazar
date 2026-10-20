@@ -237,7 +237,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({ sellerOnlineCoun
   return (
     <>
       {/* Floating Action Trigger & Alert Bubble Container */}
-      <div className="fixed bottom-6 md:bottom-12 lg:bottom-14 right-4 sm:right-6 md:right-8 z-50 flex flex-col items-end gap-2.5">
+      <div className="fixed bottom-6 md:bottom-8 lg:bottom-8 right-4 sm:right-6 md:right-8 z-50 flex flex-col items-end gap-2.5">
         
         {/* "Can I help you?" Alert Speech Bubble */}
         {showAlert && !isOpen && (
@@ -323,7 +323,7 @@ export const LiveChatWidget: React.FC<LiveChatWidgetProps> = ({ sellerOnlineCoun
       {/* Professional Live Chat Window Drawer */}
       {isOpen && (
         <div 
-          className="fixed bottom-24 md:bottom-[110px] lg:bottom-[120px] right-4 sm:right-6 md:right-8 z-50 w-[calc(100vw-2rem)] sm:w-96 max-h-[80vh] h-[550px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
+          className="fixed bottom-20 md:bottom-24 lg:bottom-24 right-4 sm:right-6 md:right-8 z-50 w-[calc(100vw-2rem)] sm:w-96 max-h-[80vh] h-[550px] bg-white rounded-3xl shadow-2xl border border-slate-200 flex flex-col overflow-hidden animate-in zoom-in-95 duration-200"
         >
           {/* Header */}
           <div className="bg-gradient-to-r from-[#14532d] to-[#15803d] text-white p-4 flex items-center justify-between shadow-md">
