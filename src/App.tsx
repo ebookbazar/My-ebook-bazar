@@ -1496,6 +1496,13 @@ function MainApp() {
         )}
       </main>
 
+      {/* Universal Footer */}
+      <Footer 
+        setCurrentView={setCurrentView} 
+        onOpenTerms={() => setIsTermsOpen(true)}
+        onOpenPrivacy={() => setIsPrivacyOpen(true)}
+      />
+
       {/* Floating Quick Search (Search across real eBooks & Blogs) - deferred to prioritize initial mobile paint */}
       {deferredWidgetsReady && (
         <Suspense fallback={null}>
@@ -1516,13 +1523,6 @@ function MainApp() {
           <LiveChatWidget sellerOnlineCount={totalSellersCount} />
         </Suspense>
       )}
-
-      {/* Universal Footer */}
-      <Footer 
-        setCurrentView={setCurrentView} 
-        onOpenTerms={() => setIsTermsOpen(true)}
-        onOpenPrivacy={() => setIsPrivacyOpen(true)}
-      />
 
       {/* MODAL 1: EBOOK DETAIL MODAL */}
       {selectedEbook && (

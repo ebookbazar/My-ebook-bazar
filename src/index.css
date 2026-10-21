@@ -24,15 +24,20 @@ body {
 /* Mobile (< 1024px) and tablet remain completely unchanged.*/
 /* ======================================================== */
 @media (min-width: 1024px) {
-  html, body, #root {
-    min-height: auto !important;
-    height: auto !important;
+  html, body {
+    min-height: 100% !important;
+    background-color: #f1f5f9 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #root {
+    min-height: 100% !important;
     background-color: #f1f5f9 !important;
   }
 
   #root > div {
-    min-height: auto !important;
-    height: auto !important;
+    min-height: 100% !important;
     background-color: #f1f5f9 !important;
   }
 
