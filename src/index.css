@@ -5,25 +5,17 @@
 }
 
 html {
-  height: 100%;
   background-color: #f1f5f9;
 }
 
 body {
-  min-height: 100%;
   margin: 0;
-  display: flex;
-  flex-direction: column;
   font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
   scroll-behavior: smooth;
   background-color: #f1f5f9;
 }
 
 #root {
-  min-height: 100%;
-  flex: 1;
-  display: flex;
-  flex-direction: column;
   background-color: #f1f5f9;
 }
 
@@ -36,15 +28,6 @@ body {
 /* Mobile (< 1024px) and tablet remain completely unchanged.*/
 /* ======================================================== */
 @media (min-width: 1024px) {
-  html,
-  body,
-  #root,
-  #root > div {
-    min-height: 0 !important;
-    height: auto !important;
-    flex: none !important;
-  }
-
   main {
     flex: none !important;
     height: auto !important;

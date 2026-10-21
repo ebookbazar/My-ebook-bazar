@@ -856,7 +856,7 @@ function MainApp() {
   };
 
   return (
-    <div className="w-full flex-1 bg-slate-100/70 text-slate-800 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
+    <div className="w-full bg-slate-100/70 text-slate-800 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
       {/* Universal Top Header (1. Header / Logo / Navigation + 2. Announcement Bar) */}
       <Header
         currentView={currentView}
