@@ -36,6 +36,15 @@ body {
 /* Mobile (< 1024px) and tablet remain completely unchanged.*/
 /* ======================================================== */
 @media (min-width: 1024px) {
+  html,
+  body,
+  #root,
+  #root > div {
+    min-height: 0 !important;
+    height: auto !important;
+    flex: none !important;
+  }
+
   main {
     flex: none !important;
     height: auto !important;
