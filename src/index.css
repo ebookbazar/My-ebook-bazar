@@ -5,42 +5,37 @@
 }
 
 html {
+  height: 100%;
   background-color: #f1f5f9;
 }
 
 body {
+  min-height: 100%;
   margin: 0;
+  display: flex;
+  flex-direction: column;
   font-family: 'Hind Siliguri', system-ui, -apple-system, sans-serif;
   scroll-behavior: smooth;
   background-color: #f1f5f9;
 }
 
 #root {
+  min-height: 100%;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
   background-color: #f1f5f9;
 }
 
 /* ======================================================== */
 /* DESKTOP HOMEPAGE SPACING (min-width: 1024px)             */
-/* Eliminates excessive gap below the 6 category cards      */
-/* and eliminates blank white area below the footer.        */
-/* Footer sits naturally after page content with normal     */
-/* ~16-24px bottom spacing (padding-bottom: 20px).          */
-/* Mobile (< 1024px) and tablet remain completely unchanged.*/
+/* Clean top and bottom padding for glassmorphism footer.   */
+/* Sticky footer architecture handled natively via flex-1.  */
 /* ======================================================== */
 @media (min-width: 1024px) {
-  main {
-    flex: none !important;
-    height: auto !important;
-    min-height: 0 !important;
-  }
-
   footer[role="contentinfo"] {
-    margin-top: 0 !important;
-    margin-bottom: 0 !important;
-    padding-top: 16px !important;
-    padding-bottom: 20px !important;
-    height: auto !important;
-    min-height: 0 !important;
+    padding-top: 16px;
+    padding-bottom: 20px;
   }
 }
 

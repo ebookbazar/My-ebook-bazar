@@ -856,7 +856,7 @@ function MainApp() {
   };
 
   return (
-    <div className="w-full bg-slate-100/70 text-slate-800 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
+    <div className="w-full flex-1 min-h-screen bg-slate-100/70 text-slate-800 flex flex-col font-sans selection:bg-emerald-600 selection:text-white">
       {/* Universal Top Header (1. Header / Logo / Navigation + 2. Announcement Bar) */}
       <Header
         currentView={currentView}
@@ -877,7 +877,7 @@ function MainApp() {
       />
 
       {/* Main Content Area */}
-      <main className="w-full container mx-auto px-3 sm:px-4 max-w-7xl pt-3 sm:pt-4 space-y-4 sm:space-y-6">
+      <main className="w-full flex-1 container mx-auto px-3 sm:px-4 max-w-7xl pt-3 sm:pt-4 space-y-4 sm:space-y-6">
         {/* VIEW 1: HOME MARKETPLACE */}
         {currentView === 'home' && (
           <div className="space-y-3 sm:space-y-4 pb-2 sm:pb-3">
