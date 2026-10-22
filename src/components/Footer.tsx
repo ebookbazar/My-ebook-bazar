@@ -12,6 +12,7 @@ import { db, ref, onValue } from '../firebase';
 import { useAuth } from '../context/AuthContext';
 
 interface FooterProps {
+  currentView?: string;
   setCurrentView: (view: string) => void;
   onOpenTerms?: () => void;
   onOpenPrivacy?: () => void;
@@ -29,6 +30,7 @@ interface FooterLinks {
 }
 
 export const Footer: React.FC<FooterProps> = ({ 
+  currentView,
   setCurrentView, 
   onOpenTerms, 
   onOpenPrivacy 
@@ -71,7 +73,7 @@ export const Footer: React.FC<FooterProps> = ({
   const currentYear = new Date().getFullYear();
 
   return (
-    <footer role="contentinfo" className="w-full mt-auto shrink-0 pt-4 sm:pt-5 pb-2 sm:pb-3 px-3 sm:px-4">
+    <footer role="contentinfo" className={`w-full ${currentView === 'home' ? 'mt-0' : 'mt-auto'} shrink-0 pt-4 sm:pt-5 pb-2 sm:pb-3 px-3 sm:px-4`}>
       {/* 
         PREMIUM GLASSMORPHISM FOOTER CONTAINER
         Deep emerald translucent glass with delicate specular border highlight,
