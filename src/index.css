@@ -39,6 +39,24 @@ body {
   }
 }
 
+/* ========================================================================= */
+/* TALL VIRTUAL PORTRAIT VIEWPORTS (e.g. mobile Chrome "Desktop site" mode)  */
+/* When a mobile browser simulates a desktop width in portrait orientation,  */
+/* prevent 100vh (2177px+) from stretching an artificial empty gap inside.   */
+/* Genuine desktop monitors are landscape orientation (16:9, 16:10, 4:3).    */
+/* ========================================================================= */
+@media (orientation: portrait) and (min-width: 768px) {
+  body, #root, .min-h-screen {
+    min-height: auto !important;
+  }
+  main.flex-1 {
+    flex: none !important;
+  }
+  footer[role="contentinfo"] {
+    margin-top: 1.5rem !important;
+  }
+}
+
 @keyframes softFadeIn {
   from {
     opacity: 0;

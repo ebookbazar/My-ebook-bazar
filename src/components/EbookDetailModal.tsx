@@ -238,23 +238,29 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
         {/* Scrollable Modal Body */}
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6">
           {activeTab === 'details' ? (
-            <div className="grid grid-cols-1 md:grid-cols-[240px_1fr] gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-6 items-start">
               {/* Cover Column */}
-              <div className="space-y-3">
-                <div className="aspect-[3/4] bg-slate-100 rounded-2xl overflow-hidden shadow-md border border-slate-200">
+              <div className="space-y-3 w-full max-w-[140px] sm:max-w-[160px] md:max-w-[180px] mx-auto md:mx-0 shrink-0 flex flex-col items-center">
+                <div className="w-full max-w-[120px] md:max-w-[160px] max-h-[160px] md:max-h-[213px] bg-slate-100/80 rounded-2xl overflow-hidden shadow-md border border-slate-200 flex items-center justify-center p-1 mx-auto">
                   <img 
                     src={ebook.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop'} 
                     alt={ebook.title} 
-                    className="w-full h-full object-cover"
+                    className="block w-auto h-auto max-w-[120px] md:max-w-[160px] max-h-[160px] md:max-h-[213px] aspect-[3/4] object-contain rounded-xl shadow-xs mx-auto"
+                    style={{
+                      display: 'block',
+                      width: 'auto',
+                      height: 'auto',
+                      objectFit: 'contain'
+                    }}
                   />
                 </div>
                 {ebook.pdfUrl && onOpenPreview && (
                   <button
                     type="button"
                     onClick={() => onOpenPreview(ebook.pdfUrl, ebook.title)}
-                    className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black text-sm py-2.5 rounded-2xl border border-emerald-300 flex items-center justify-center gap-2 transition active:scale-95 shadow-xs"
+                    className="w-full bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-black text-xs py-2 rounded-xl border border-emerald-300 flex items-center justify-center gap-1.5 transition active:scale-95 shadow-xs"
                   >
-                    <BookOpen className="w-4 h-4 text-emerald-600" />
+                    <BookOpen className="w-3.5 h-3.5 text-emerald-600" />
                     <span>বই প্রিভিউ পড়ুন</span>
                   </button>
                 )}
@@ -262,17 +268,19 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
                 {/* Rating summary snapshot on left card */}
                 <div 
                   onClick={() => setActiveTab('reviews')}
-                  className="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl cursor-pointer hover:bg-amber-100/70 transition space-y-1"
+                  className="w-full p-2.5 bg-amber-50/70 border border-amber-200 rounded-xl cursor-pointer hover:bg-amber-100/70 transition space-y-1 text-center"
                 >
                   <span className="text-[10px] font-black text-amber-900 uppercase tracking-wide block">
                     গ্রাহক মূল্যায়ন
                   </span>
-                  <StarRating
-                    rating={currentSummary.averageRating}
-                    totalRatings={currentSummary.totalRatings}
-                    size="sm"
-                    compact={false}
-                  />
+                  <div className="flex justify-center">
+                    <StarRating
+                      rating={currentSummary.averageRating}
+                      totalRatings={currentSummary.totalRatings}
+                      size="sm"
+                      compact={false}
+                    />
+                  </div>
                   <span className="text-[11px] text-emerald-800 font-bold hover:underline block pt-0.5">
                     রিভিউ দেখুন বা রেটিং দিন →
                   </span>
