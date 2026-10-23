@@ -87,7 +87,7 @@ export const EbooksCatalogView: React.FC<EbooksCatalogViewProps> = React.memo(({
   }, [ebooks, selectedCategory, selectedLevel, searchQuery, sortBy]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-12 animate-fadeIn">
+    <div className="space-y-6 max-w-7xl mx-auto pb-3 sm:pb-4 animate-fadeIn">
       {/* Top Navigation Bar with Back to Home Button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200/90 shadow-sm">
         <button
