@@ -50,35 +50,39 @@ export const EbookCard: React.FC<EbookCardProps> = React.memo(({ ebook, onViewDe
       className="bg-white rounded-2xl border border-slate-200 shadow-sm hover:shadow-xl transition-all duration-300 overflow-hidden flex flex-col justify-between group cursor-pointer w-full min-w-0 max-w-full"
     >
       {/* Cover Image Container */}
-      <div className="relative aspect-[3/4] w-full bg-slate-100 overflow-hidden">
-        <img 
-          src={getOptimizedImageUrl(ebook.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f', { width: 320, height: 426, quality: 72 })} 
-          alt={ebook.title} 
-          width={300}
-          height={400}
-          decoding="async"
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500 max-w-full"
-          loading="lazy"
-        />
-        <div className="absolute top-2 left-2 sm:top-2.5 sm:left-2.5 flex flex-col gap-1 sm:gap-1.5 z-10 max-w-[calc(100%-1rem)]">
-          {isAdminBook ? (
-            <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[10px] sm:text-xs font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg sm:rounded-xl shadow-md border border-amber-300 flex items-center gap-1 sm:gap-1.5 tracking-wide truncate">
-              <Crown className="w-3.5 h-3.5 fill-slate-950 text-slate-950 shrink-0" />
-              <span className="truncate">অ্যাডমিন ই-বুক</span>
+      <div className="w-full bg-slate-50/70 md:bg-slate-100 p-2.5 sm:p-3 md:p-0 flex items-center justify-center relative min-w-0 overflow-hidden">
+        <div className="relative w-[120px] h-[160px] max-w-[120px] max-h-[160px] aspect-[3/4] shrink-0 rounded-xl overflow-hidden shadow-sm border border-slate-200/80 bg-white flex items-center justify-center mx-auto md:w-full md:h-auto md:max-w-none md:max-h-none md:rounded-none md:border-0 md:shadow-none md:aspect-[3/4]">
+          <img 
+            src={getOptimizedImageUrl(ebook.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f', { width: 320, height: 426, quality: 72 })} 
+            alt={ebook.title} 
+            width={120}
+            height={160}
+            decoding="async"
+            className="w-full h-full object-contain md:object-cover group-hover:scale-105 transition-transform duration-500 max-w-full"
+            loading="lazy"
+          />
+          {/* Badges on cover: compact and proportional on mobile, standard on desktop */}
+          <div className="absolute top-1.5 left-1.5 md:top-2.5 md:left-2.5 flex flex-col gap-1 md:gap-1.5 z-10 max-w-[calc(100%-0.75rem)] md:max-w-[calc(100%-1rem)]">
+            {isAdminBook ? (
+              <span className="bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[9px] md:text-xs font-black px-1.5 md:px-3 py-0.5 md:py-1 rounded-md md:rounded-xl shadow-xs md:shadow-md border border-amber-300 flex items-center gap-1 md:gap-1.5 tracking-wide truncate">
+                <Crown className="w-3 h-3 md:w-3.5 md:h-3.5 fill-slate-950 text-slate-950 shrink-0" />
+                <span className="truncate">অ্যাডমিন</span>
+              </span>
+            ) : (
+              <span className="bg-indigo-600 text-white text-[9px] md:text-xs font-black px-1.5 md:px-3 py-0.5 md:py-1 rounded-md md:rounded-xl shadow-xs md:shadow-md border border-indigo-400 flex items-center gap-1 md:gap-1.5 tracking-wide truncate">
+                <ShoppingBag className="w-3 h-3 md:w-3.5 md:h-3.5 shrink-0" />
+                <span className="truncate">সেলার</span>
+              </span>
+            )}
+            <span className="bg-slate-950/90 backdrop-blur-md text-emerald-300 text-[9px] md:text-xs font-black px-1.5 md:px-2.5 py-0.5 rounded-md md:rounded-lg shadow-xs w-fit border border-emerald-500/30 truncate">
+              {ebook.category || 'সাধারণ'}
             </span>
-          ) : (
-            <span className="bg-indigo-600 text-white text-[10px] sm:text-xs font-black px-2 sm:px-3 py-0.5 sm:py-1 rounded-lg sm:rounded-xl shadow-md border border-indigo-400 flex items-center gap-1 sm:gap-1.5 tracking-wide truncate">
-              <ShoppingBag className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">সেলার ই-বুক</span>
-            </span>
-          )}
-          <span className="bg-slate-950/90 backdrop-blur-md text-emerald-300 text-[10px] sm:text-xs font-black px-2 sm:px-2.5 py-0.5 rounded-md sm:rounded-lg shadow-sm w-fit border border-emerald-500/30 truncate">
-            {ebook.category || 'সাধারণ'}
-          </span>
-        </div>
-        <div className="absolute bottom-2.5 right-2.5 bg-slate-950/85 text-white text-[10px] sm:text-xs font-bold px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-lg sm:rounded-xl flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Eye className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
-          <span>বিস্তারিত</span>
+          </div>
+
+          <div className="hidden md:flex absolute bottom-2.5 right-2.5 bg-slate-950/85 text-white text-xs font-bold px-2.5 py-1 rounded-xl items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Eye className="w-3.5 h-3.5" />
+            <span>বিস্তারিত</span>
+          </div>
         </div>
       </div>
 

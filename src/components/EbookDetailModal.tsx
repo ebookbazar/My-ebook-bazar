@@ -235,17 +235,46 @@ export const EbookDetailModal: React.FC<EbookDetailModalProps> = ({
           </button>
         </div>
 
+        {/* Scoped responsive cover dimensions: Mobile max 120x160 (3:4 ratio), Desktop max 160x213 (3:4 ratio) */}
+        <style>{`
+          .modal-ebook-cover-wrapper {
+            width: 100%;
+            max-width: 120px;
+            max-height: 160px;
+            aspect-ratio: 3 / 4;
+          }
+          .modal-ebook-cover-img {
+            display: block;
+            width: auto;
+            height: auto;
+            max-width: 120px;
+            max-height: 160px;
+            aspect-ratio: 3 / 4;
+            object-fit: contain;
+          }
+          @media (min-width: 768px) {
+            .modal-ebook-cover-wrapper {
+              max-width: 160px;
+              max-height: 213px;
+            }
+            .modal-ebook-cover-img {
+              max-width: 160px;
+              max-height: 213px;
+            }
+          }
+        `}</style>
+
         {/* Scrollable Modal Body */}
         <div className="p-5 sm:p-6 overflow-y-auto flex-1 space-y-6">
           {activeTab === 'details' ? (
             <div className="grid grid-cols-1 md:grid-cols-[180px_1fr] gap-6 items-start">
               {/* Cover Column */}
-              <div className="space-y-3 w-full max-w-[140px] sm:max-w-[160px] md:max-w-[180px] mx-auto md:mx-0 shrink-0 flex flex-col items-center">
-                <div className="w-full max-w-[120px] md:max-w-[160px] max-h-[160px] md:max-h-[213px] bg-slate-100/80 rounded-2xl overflow-hidden shadow-md border border-slate-200 flex items-center justify-center p-1 mx-auto">
+              <div className="space-y-3 w-full max-w-[120px] md:max-w-[160px] mx-auto md:mx-0 shrink-0 flex flex-col items-center">
+                <div className="modal-ebook-cover-wrapper w-full max-w-[120px] md:max-w-[160px] max-h-[160px] md:max-h-[213px] aspect-[3/4] bg-slate-100/80 rounded-2xl overflow-hidden shadow-md border border-slate-200 flex items-center justify-center p-1 mx-auto">
                   <img 
                     src={ebook.coverUrl || 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?q=80&w=600&auto=format&fit=crop'} 
                     alt={ebook.title} 
-                    className="block w-auto h-auto max-w-[120px] md:max-w-[160px] max-h-[160px] md:max-h-[213px] aspect-[3/4] object-contain rounded-xl shadow-xs mx-auto"
+                    className="modal-ebook-cover-img block w-auto h-auto max-w-[120px] md:max-w-[160px] max-h-[160px] md:max-h-[213px] aspect-[3/4] object-contain rounded-xl shadow-xs mx-auto"
                     style={{
                       display: 'block',
                       width: 'auto',

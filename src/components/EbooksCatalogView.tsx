@@ -87,7 +87,7 @@ export const EbooksCatalogView: React.FC<EbooksCatalogViewProps> = React.memo(({
   }, [ebooks, selectedCategory, selectedLevel, searchQuery, sortBy]);
 
   return (
-    <div className="space-y-6 max-w-7xl mx-auto pb-3 sm:pb-4 animate-fadeIn">
+    <div className="space-y-6 max-w-7xl mx-auto pb-3 sm:pb-4 animate-fadeIn overflow-x-hidden w-full">
       {/* Top Navigation Bar with Back to Home Button */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 bg-white/95 backdrop-blur-md p-4 rounded-2xl border border-slate-200/90 shadow-sm">
         <button
@@ -239,7 +239,7 @@ export const EbooksCatalogView: React.FC<EbooksCatalogViewProps> = React.memo(({
             </button>
           </div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5">
+          <div className="grid grid-cols-2 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2.5 sm:gap-4 md:gap-5 w-full min-w-0">
             {filteredEbooks.map((book) => (
               <EbookCard
                 key={book.id}
