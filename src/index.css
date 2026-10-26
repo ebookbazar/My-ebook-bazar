@@ -5,12 +5,13 @@
 }
 
 html {
-  height: 100%;
+  min-height: 100%;
   background-color: #f1f5f9;
 }
 
 body {
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   margin: 0;
   display: flex;
   flex-direction: column;
@@ -20,18 +21,15 @@ body {
 }
 
 #root {
-  min-height: 100%;
+  min-height: 100vh;
+  min-height: 100dvh;
   flex: 1;
   display: flex;
   flex-direction: column;
   background-color: #f1f5f9;
 }
 
-/* ======================================================== */
-/* DESKTOP HOMEPAGE SPACING (min-width: 1024px)             */
-/* Clean top and bottom padding for glassmorphism footer.   */
-/* Sticky footer architecture handled natively via flex-1.  */
-/* ======================================================== */
+/* Desktop footer spacing */
 @media (min-width: 1024px) {
   footer[role="contentinfo"] {
     padding-top: 16px;
@@ -39,23 +37,7 @@ body {
   }
 }
 
-/* ========================================================================= */
-/* TALL VIRTUAL PORTRAIT VIEWPORTS (e.g. mobile Chrome "Desktop site" mode)  */
-/* When a mobile browser simulates a desktop width in portrait orientation,  */
-/* prevent 100vh (2177px+) from stretching an artificial empty gap inside.   */
-/* Genuine desktop monitors are landscape orientation (16:9, 16:10, 4:3).    */
-/* ========================================================================= */
-@media (orientation: portrait) and (min-width: 768px) {
-  body, #root, .min-h-screen {
-    min-height: auto !important;
-  }
-  main.flex-1 {
-    flex: none !important;
-  }
-  footer[role="contentinfo"] {
-    margin-top: 1.5rem !important;
-  }
-}
+/* Keep the normal flex layout on all screen orientations */
 
 @keyframes softFadeIn {
   from {
@@ -73,16 +55,15 @@ body {
 }
 
 .subtle-card-hover {
-  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .subtle-card-hover:hover {
   transform: translateY(-2px);
 }
 
-/* ======================================================== */
-/* 3. PUBLIC ARTICLE FORMATTING (.blog-post-content)        */
-/* ======================================================== */
+/* Public article formatting */
 .blog-post-content {
   line-height: 1.85;
   overflow-wrap: anywhere;
@@ -174,4 +155,3 @@ body {
   display: block;
   border: 1px solid #e2e8f0;
 }
-
